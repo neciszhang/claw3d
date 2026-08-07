@@ -6,13 +6,9 @@ A 3D claw machine web game built with React + Three.js + the Rapier physics engi
 
 > Live preview link: [coming soon](#) (replace this link after deployment, e.g. GitHub Pages / Vercel)
 
-## Screenshots
+## Screenshot
 
-| Main Gameplay | Grabbing Moment |
-|:---:|:---:|
-| ![Main Gameplay](docs/screenshot-main.png) | ![Grabbing Moment](docs/screenshot-grab.png) |
-
-> The above are placeholder images. Place actual game screenshots in the `docs/` directory and replace the filenames.
+![Claw Machine 3D Gameplay](screenshot/20260807172320.jpg)
 
 ## Features
 
