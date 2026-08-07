@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Sparkles, Stars } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -136,11 +136,11 @@ function Comets() {
 /** 小地图渲染时隐藏舞台装饰，避免第二次全场景绘制的开销 */
 export const stageGroupRef: { current: THREE.Group | null } = { current: null }
 
-const BASE_WAVE_VERT = /* glsl */ `
+const QUAD_VERT = /* glsl */ `
   varying vec2 vUv;
   void main() {
     vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_Position = vec4(position.xy, 0.0, 1.0);
   }
 `
 
@@ -222,6 +222,81 @@ const BASE_WAVE_FRAG = /* glsl */ `
     gl_FragColor = vec4(col, alpha);
   }
 `
+
+const PASS_VERT = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+
+/** 直通采样：跳过 three 的颜色空间编码，保持离屏 raymarch 的原始观感 */
+const PASS_FRAG = /* glsl */ `
+  uniform sampler2D uMap;
+  varying vec2 vUv;
+  void main() {
+    gl_FragColor = texture2D(uMap, vUv);
+  }
+`
+
+/** 幻影底盘：raymarch 渲到低分辨率离屏纹理（片元量 ~1/20），隔帧刷新后贴回地面圆盘 */
+function PhantomFloor() {
+  const quality = useGameStore((st) => st.settings.quality)
+  const size = quality === 'high' ? 512 : 320
+  const rt = useMemo(() => {
+    return new THREE.WebGLRenderTarget(size, size, { depthBuffer: false, stencilBuffer: false })
+  }, [size])
+  const quad = useMemo(() => {
+    const scene = new THREE.Scene()
+    const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: QUAD_VERT,
+      fragmentShader: BASE_WAVE_FRAG,
+      uniforms: { uTime: { value: 0 } },
+      depthTest: false,
+      depthWrite: false,
+    })
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat))
+    return { scene, cam, mat }
+  }, [])
+  const passUniforms = useMemo(() => ({ uMap: { value: rt.texture } }), [rt])
+  const simT = useRef(0)
+  const frame = useRef(0)
+  useEffect(() => () => rt.dispose(), [rt])
+  useFrame(({ gl }, delta) => {
+    // 平时慢速流动；抓中后短暂加速，随后平滑回落
+    let speed = 0.35
+    if (refs.successPulseAt > 0) {
+      const e = (performance.now() - refs.successPulseAt) / 1000
+      if (e < 5) speed += 2.1 * Math.exp(-e * 1.1)
+    }
+    simT.current += Math.min(delta, 0.05) * speed
+    // 慢速流动隔帧刷新即可，再省一半 raymarch 开销
+    frame.current++
+    if (frame.current % 2 === 0) {
+      quad.mat.uniforms.uTime.value = simT.current
+      const prev = gl.getRenderTarget()
+      gl.setRenderTarget(rt)
+      gl.render(quad.scene, quad.cam)
+      gl.setRenderTarget(prev)
+    }
+  })
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.705, 0.2]}>
+      <circleGeometry args={[22, 64]} />
+      <shaderMaterial
+        vertexShader={PASS_VERT}
+        fragmentShader={PASS_FRAG}
+        uniforms={passUniforms}
+        transparent
+        depthWrite={false}
+        toneMapped={false}
+        fog={false}
+      />
+    </mesh>
+  )
+}
 
 const NOISE_GLSL = /* glsl */ `
   float hash(vec3 p) {
@@ -323,20 +398,9 @@ export function Stage() {
   const glowPink = useMemo(() => makeGlowTexture('rgba(255, 92, 138, 0.55)'), [])
   const glowCyan = useMemo(() => makeGlowTexture('rgba(77, 216, 255, 0.4)'), [])
   const auroraUniforms = useMemo(() => ({ uTime: { value: 0 } }), [])
-  const baseWaveUniforms = useMemo(() => ({ uTime: { value: 0 } }), [])
-  const baseWaveMat = useRef<THREE.ShaderMaterial>(null)
-  const baseTime = useRef(0)
 
-  useFrame(({ clock }, delta) => {
+  useFrame(({ clock }) => {
     auroraUniforms.uTime.value = clock.elapsedTime
-    // 幻影底盘：平时慢速流动；抓中后短暂加速，随后平滑回落
-    let speed = 0.35
-    if (refs.successPulseAt > 0) {
-      const e = (performance.now() - refs.successPulseAt) / 1000
-      if (e < 5) speed += 2.1 * Math.exp(-e * 1.1)
-    }
-    baseTime.current += Math.min(delta, 0.05) * speed
-    if (baseWaveMat.current) baseWaveMat.current.uniforms.uTime.value = baseTime.current
   })
 
   return (
@@ -378,21 +442,7 @@ export function Stage() {
         <meshBasicMaterial color="#0a0620" fog={false} toneMapped={false} />
       </mesh>
 
-      {/* 幻影星云底盘：raymarch 分形隧道铺满整个舞台地面 */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.705, 0.2]}>
-        <circleGeometry args={[22, 64]} />
-        <shaderMaterial
-          key={BASE_WAVE_FRAG}
-          ref={baseWaveMat}
-          vertexShader={BASE_WAVE_VERT}
-          fragmentShader={BASE_WAVE_FRAG}
-          uniforms={baseWaveUniforms}
-          transparent
-          depthWrite={false}
-          toneMapped={false}
-          fog={false}
-        />
-      </mesh>
+      <PhantomFloor />
 
       {/* 机箱背后辉光 */}
       <sprite position={[0, 0.6, -3.2]} scale={[10, 6, 1]}>
