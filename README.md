@@ -1,141 +1,141 @@
 # Claw Machine 3D
 
-基于 React + Three.js + Rapier 物理引擎构建的 3D 娃娃机网页游戏。通过虚拟摇杆或键盘操控天车爪子，在限定币数内尽可能多地抓取玩具投入出口，还原真实娃娃机的手感与紧张感。
+A 3D claw machine web game built with React + Three.js + the Rapier physics engine. Drive the overhead claw via a virtual joystick or keyboard, and grab as many toys as possible into the exit chute within a limited number of coins — recreating the feel and tension of a real claw machine.
 
-## 在线预览
+## Live Preview
 
-> 在线预览链接：[即将上线](#)（部署后请替换此链接，例如 GitHub Pages / Vercel）
+> Live preview link: [coming soon](#) (replace this link after deployment, e.g. GitHub Pages / Vercel)
 
-## 截图预览
+## Screenshots
 
-| 游戏主界面 | 抓取瞬间 |
+| Main Gameplay | Grabbing Moment |
 |:---:|:---:|
-| ![游戏主界面](docs/screenshot-main.png) | ![抓取瞬间](docs/screenshot-grab.png) |
+| ![Main Gameplay](docs/screenshot-main.png) | ![Grabbing Moment](docs/screenshot-grab.png) |
 
-> 以上为截图占位符，请将实际游戏截图放入 `docs/` 目录并替换文件名。
+> The above are placeholder images. Place actual game screenshots in the `docs/` directory and replace the filenames.
 
-## 功能特性
+## Features
 
-- 真实物理模拟：基于 Rapier 3D 刚体物理，玩具碰撞、堆叠、滑落均实时计算
-- 三爪抓取机制：天车移动 → 下降 → 闭合 → 上升 → 移至出口 → 释放，完整还原娃娃机操作流程
-- 多难度系统：简单 / 标准 / 困难，影响爪子速度、传感器半径与玩具布局密度
-- 投币制玩法：每局 15 枚硬币，硬币耗尽即结束，统计成功率与最快通关时间
-- 双端操控：移动端虚拟摇杆 + 桌面端键盘（WASD/方向键移动，空格/回车抓取）
-- 实时小地图：俯视展示爪子位置与玩具分布，辅助瞄准
-- 中英双语：内置 i18n，支持中文 / English 切换
-- 画质自适应：高 / 低画质档位，自动适配设备像素比与阴影
-- 音效与振动：投币、抓取、成功 / 失败音效，移动端触觉反馈
-- 新手教程：首次进入引导操作流程，可跳过
-- 数据持久化：设置、统计数据本地存储，刷新不丢失
-- WebGL 能力检测：不支持时友好提示，上下文丢失可恢复
+- Realistic physics simulation: powered by Rapier 3D rigid-body physics; toy collision, stacking, and sliding are computed in real time
+- Three-prong grab mechanic: move → descend → close → ascend → move to exit → release, fully reproducing the claw machine operation flow
+- Multiple difficulty levels: Easy / Normal / Hard, affecting claw speed, sensor radius, and toy layout density
+- Coin-based gameplay: 15 coins per session; the round ends when coins run out, tracking success rate and fastest completion time
+- Dual-platform controls: virtual joystick on mobile + keyboard on desktop (WASD / arrow keys to move, Space / Enter to grab)
+- Real-time minimap: top-down view showing claw position and toy distribution for easier aiming
+- Bilingual (zh / en): built-in i18n with Chinese / English switching
+- Adaptive quality: high / low quality presets, auto-adjusting device pixel ratio and shadows
+- Sound effects & haptics: coin, grab, success / failure sounds with mobile vibration feedback
+- Onboarding tutorial: first-time guided walkthrough, skippable
+- Data persistence: settings and stats stored locally, surviving page refreshes
+- WebGL capability detection: graceful fallback when unsupported, with context-loss recovery
 
-## 技术栈
+## Tech Stack
 
-| 类别 | 技术 | 版本 |
+| Category | Technology | Version |
 | --- | --- | --- |
-| 前端框架 | React + React DOM | ^19.2 |
-| 3D 渲染 | Three.js | ^0.185 |
-| React 3D 绑定 | @react-three/fiber | ^9.7 |
-| 3D 物理引擎 | @react-three/rapier (Rapier) | ^2.2 |
-| 3D 辅助库 | @react-three/drei | ^10.7 |
-| 状态管理 | Zustand | ^5.0 |
-| 构建工具 | Vite | ^5.4 |
-| 类型系统 | TypeScript | ^5.6 |
+| UI Framework | React + React DOM | ^19.2 |
+| 3D Rendering | Three.js | ^0.185 |
+| React 3D Bindings | @react-three/fiber | ^9.7 |
+| 3D Physics Engine | @react-three/rapier (Rapier) | ^2.2 |
+| 3D Helpers | @react-three/drei | ^10.7 |
+| State Management | Zustand | ^5.0 |
+| Build Tool | Vite | ^5.4 |
+| Type System | TypeScript | ^5.6 |
 
-## 快速开始
+## Getting Started
 
-### 环境要求
+### Prerequisites
 
 - Node.js >= 18
-- npm >= 9（或使用 pnpm / yarn 等包管理器）
+- npm >= 9 (or use pnpm / yarn etc.)
 
-### 安装依赖
+### Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 本地开发
+### Local Development
 
 ```bash
 npm run dev
 ```
 
-启动 Vite 开发服务器，默认访问 `http://localhost:5173`（已开启 `host: true`，可局域网访问）。
+Starts the Vite dev server, available at `http://localhost:5173` by default (`host: true` is enabled for LAN access).
 
-### 生产构建
+### Production Build
 
 ```bash
 npm run build
 ```
 
-先执行 `tsc -b` 进行类型检查与编译，再执行 `vite build` 打包，产物输出到 `dist/`。
+Runs `tsc -b` for type checking and compilation, then `vite build` to bundle. Output goes to `dist/`.
 
-### 预览构建产物
+### Preview Build
 
 ```bash
 npm run preview
 ```
 
-本地启动静态服务器预览 `dist/` 中的生产构建结果。
+Starts a local static server to preview the production build in `dist/`.
 
-## 项目结构
+## Project Structure
 
 ```
 claw3d/
 ├── public/
-│   └── models/              # 3D 模型资源（.glb）
-│       ├── boxoutnew.glb            # 机箱（含 WebP 纹理）
-│       ├── boxoutnewWithOutWebp.glb # 机箱（无 WebP 纹理，兜底）
-│       ├── clawoutnew.glb           # 爪子组件
-│       ├── dogout.glb              # 玩具（含 WebP 纹理）
-│       └── dogoutWithOutWebp.glb    # 玩具（无 WebP 纹理，兜底）
+│   └── models/              # 3D model assets (.glb)
+│       ├── boxoutnew.glb            # Cabinet (with WebP textures)
+│       ├── boxoutnewWithOutWebp.glb # Cabinet (without WebP textures, fallback)
+│       ├── clawoutnew.glb           # Claw assembly
+│       ├── dogout.glb              # Toys (with WebP textures)
+│       └── dogoutWithOutWebp.glb    # Toys (without WebP textures, fallback)
 ├── src/
 │   ├── audio/
-│   │   └── soundManager.ts         # 音效与振动管理
+│   │   └── soundManager.ts         # Sound effects and haptics management
 │   ├── config/
-│   │   └── gameConfig.ts           # 游戏常量配置（物理、爪子、难度、渲染等）
-│   ├── game/                        # 3D 场景与游戏逻辑组件
-│   │   ├── Scene.tsx                # 3D 场景入口（灯光、物理世界、组件编排）
-│   │   ├── Stage.tsx                # 舞台与机箱渲染
-│   │   ├── Machine.tsx             # 娃娃机机箱主体
-│   │   ├── Claw.tsx                # 爪子模型与动画
-│   │   ├── GrabController.tsx      # 抓取流程控制器（下降/闭合/上升/出口/释放）
-│   │   ├── Toys.tsx                # 玩具生成与物理刚体
-│   │   ├── CameraRig.tsx           # 相机轨道控制
-│   │   └── MinimapRenderer.tsx     # 俯视小地图渲染
+│   │   └── gameConfig.ts           # Game constants (physics, claw, difficulty, rendering, etc.)
+│   ├── game/                        # 3D scene and game logic components
+│   │   ├── Scene.tsx                # 3D scene entry (lights, physics world, component orchestration)
+│   │   ├── Stage.tsx                # Stage and cabinet rendering
+│   │   ├── Machine.tsx             # Claw machine cabinet body
+│   │   ├── Claw.tsx                # Claw model and animation
+│   │   ├── GrabController.tsx      # Grab flow controller (descend / close / ascend / exit / release)
+│   │   ├── Toys.tsx                # Toy spawning and physics rigid bodies
+│   │   ├── CameraRig.tsx           # Camera orbit controls
+│   │   └── MinimapRenderer.tsx     # Top-down minimap rendering
 │   ├── hooks/
-│   │   └── useKeyboard.ts          # 键盘输入 Hook
+│   │   └── useKeyboard.ts          # Keyboard input hook
 │   ├── i18n/
-│   │   └── index.ts               # 中英文文案
+│   │   └── index.ts               # Chinese / English copy
 │   ├── store/
-│   │   ├── gameStore.ts           # Zustand 全局状态（状态机、设置、统计）
-│   │   ├── persistence.ts         # localStorage 持久化工具
-│   │   └── refs.ts               # 非 React 渲染周期的可变引用（输入、阶段计时）
-│   ├── ui/                         # 2D UI 覆盖层组件
-│   │   ├── HUD.tsx                # 顶部信息栏（币数、玩具数、计时）
-│   │   ├── Joystick.tsx           # 移动端虚拟摇杆
-│   │   ├── StartButton.tsx        # 抓取按钮
-│   │   ├── LoadingScreen.tsx      # 加载界面
-│   │   ├── Tutorial.tsx           # 新手教程引导
-│   │   ├── Modals.tsx             # 结果/暂停/完成/错误等弹窗
-│   │   ├── SettingsPanel.tsx      # 设置面板（音效/画质/难度/语言/历史记录）
-│   │   └── PerfPanel.tsx          # 性能监控面板
+│   │   ├── gameStore.ts           # Zustand global state (state machine, settings, stats)
+│   │   ├── persistence.ts         # localStorage persistence utilities
+│   │   └── refs.ts               # Mutable refs outside React render cycle (input, phase timing)
+│   ├── ui/                         # 2D UI overlay components
+│   │   ├── HUD.tsx                # Top info bar (coins, toy count, timer)
+│   │   ├── Joystick.tsx           # Mobile virtual joystick
+│   │   ├── StartButton.tsx        # Grab button
+│   │   ├── LoadingScreen.tsx      # Loading screen
+│   │   ├── Tutorial.tsx           # Onboarding tutorial
+│   │   ├── Modals.tsx             # Result / pause / complete / error modals
+│   │   ├── SettingsPanel.tsx      # Settings panel (sound / quality / difficulty / language / history)
+│   │   └── PerfPanel.tsx          # Performance monitor panel
 │   ├── utils/
-│   │   └── capabilities.ts        # WebGL 能力检测
-│   ├── App.tsx                    # 应用根组件（Canvas + UI 编排）
-│   ├── main.tsx                   # React 入口
-│   └── styles.css                 # 全局样式
+│   │   └── capabilities.ts        # WebGL capability detection
+│   ├── App.tsx                    # Root app component (Canvas + UI orchestration)
+│   ├── main.tsx                   # React entry
+│   └── styles.css                 # Global styles
 ├── index.html
 ├── vite.config.ts
 ├── tsconfig.json
 └── package.json
 ```
 
-## 浏览器支持
+## Browser Support
 
-需支持 WebGL 2 的现代浏览器（Chrome / Edge / Firefox / Safari 最新版本）。移动端建议 iOS 15+ / Android 10+。
+Requires a modern browser with WebGL 2 support (latest Chrome / Edge / Firefox / Safari). On mobile, iOS 15+ / Android 10+ is recommended.
 
 ## License
 
-本项目采用 MIT License，详见 [LICENSE](./LICENSE)。
+This project is licensed under the MIT License. See [LICENSE](./LICENSE).
