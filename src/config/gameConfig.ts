@@ -1,10 +1,12 @@
 export type Difficulty = 'easy' | 'normal' | 'hard'
 export type Quality = 'high' | 'low'
 
+const BASE = import.meta.env.BASE_URL
+
 export const ASSETS = {
-  box: { webp: '/models/boxoutnew.glb', fallback: '/models/boxoutnewWithOutWebp.glb' },
-  dog: { webp: '/models/dogout.glb', fallback: '/models/dogoutWithOutWebp.glb' },
-  claw: { webp: '/models/clawoutnew.glb', fallback: '/models/clawoutnew.glb' },
+  box: { webp: `${BASE}models/boxoutnew.glb`, fallback: `${BASE}models/boxoutnewWithOutWebp.glb` },
+  dog: { webp: `${BASE}models/dogout.glb`, fallback: `${BASE}models/dogoutWithOutWebp.glb` },
+  claw: { webp: `${BASE}models/clawoutnew.glb`, fallback: `${BASE}models/clawoutnew.glb` },
 }
 
 export const PHYSICS = {
