@@ -33,7 +33,7 @@ body {
   inset: 0;
 }
 
-/* ---------- UI 层 ---------- */
+/* ---------- UI Layer ---------- */
 .ui-layer {
   position: absolute;
   inset: 0;
@@ -91,7 +91,7 @@ body {
   font-weight: 700;
 }
 
-/* ---------- 收藏栏 ---------- */
+/* ---------- Collection Bar ---------- */
 .collection-bar {
   width: 100%;
   display: flex;
@@ -190,7 +190,7 @@ body {
   opacity: 0.75;
 }
 
-/* ---------- 小地图边框 ---------- */
+/* ---------- Minimap Frame ---------- */
 .minimap-frame {
   position: absolute;
   border: 2px solid rgba(157, 180, 255, 0.5);
@@ -201,7 +201,7 @@ body {
     inset 0 0 8px rgba(120, 130, 255, 0.15);
 }
 
-/* ---------- 摇杆 ---------- */
+/* ---------- Joystick ---------- */
 .joystick {
   position: absolute;
   left: calc(20px + env(safe-area-inset-left));
@@ -300,7 +300,7 @@ body {
   }
 }
 
-/* ---------- 全屏页 ---------- */
+/* ---------- Full-screen Pages ---------- */
 .screen {
   position: absolute;
   inset: 0;
@@ -374,7 +374,7 @@ body {
   opacity: 0.7;
 }
 
-/* ---------- 弹层 ---------- */
+/* ---------- Overlays ---------- */
 .modal-backdrop {
   position: absolute;
   inset: 0;
@@ -464,7 +464,7 @@ body {
   color: #9db4ff;
 }
 
-/* ---------- 按钮 ---------- */
+/* ---------- Buttons ---------- */
 .btn {
   min-height: 44px;
   padding: 10px 18px;
@@ -523,7 +523,7 @@ body {
   gap: 10px;
 }
 
-/* ---------- 引导 ---------- */
+/* ---------- Tutorial ---------- */
 .tutorial-dots {
   display: flex;
   gap: 6px;
@@ -541,7 +541,7 @@ body {
   background: #ffd257;
 }
 
-/* ---------- 设置 ---------- */
+/* ---------- Settings ---------- */
 .settings-card,
 .history-card,
 .help-card {
@@ -638,7 +638,7 @@ body {
   text-align: center;
 }
 
-/* ---------- 记录 ---------- */
+/* ---------- Records ---------- */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -709,7 +709,7 @@ body {
   color: #ffd257;
 }
 
-/* ---------- 可访问性 ---------- */
+/* ---------- Accessibility ---------- */
 button:focus-visible {
   outline: 3px solid #7ec8ff;
   outline-offset: 2px;
@@ -729,7 +729,7 @@ button:focus-visible {
   }
 }
 
-/* ---------- 横屏 ---------- */
+/* ---------- Landscape ---------- */
 @media (orientation: landscape) and (max-height: 500px) {
   .joystick {
     bottom: calc(16px + env(safe-area-inset-bottom));
@@ -742,7 +742,7 @@ button:focus-visible {
   }
 }
 
-/* ---------- 性能面板 ---------- */
+/* ---------- Performance Panel ---------- */
 .perf-panel {
   position: absolute;
   left: calc(12px + env(safe-area-inset-left));
@@ -769,7 +769,7 @@ button:focus-visible {
 .perf-fps.ok { color: #ffd257; }
 .perf-fps.bad { color: #ff7a7a; }
 
-/* ---------- 桌面端：控件向中心收拢 ---------- */
+/* ---------- Desktop: controls gathered toward center ---------- */
 @media (min-width: 900px) {
   .joystick {
     left: calc(50% - 330px);

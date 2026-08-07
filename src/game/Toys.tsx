@@ -12,7 +12,7 @@ export function dogModelUrl(): string {
   return supportsWebP() ? ASSETS.dog.webp : ASSETS.dog.fallback
 }
 
-/** 抓取控制器通过该注册表直接操作玩偶刚体 */
+/** Grab controller manipulates toy rigid bodies directly through this registry */
 export const toyRegistry = new Map<number, RapierRigidBody>()
 
 const COLLECT_DELAY = 1500
@@ -34,7 +34,7 @@ function Toy({ id, spawn }: { id: number; spawn: [number, number] }) {
     return cloned
   }, [scene])
 
-  // 落入出口后延迟片刻播放“取走”动画（方案 A：回收防堆积）
+  // Delay briefly after a toy falls into the exit, then play the collect animation (approach A: recycle to prevent pile-up)
   useEffect(() => {
     if (status !== 'out') return
     const timer = window.setTimeout(() => {
@@ -52,7 +52,7 @@ function Toy({ id, spawn }: { id: number; spawn: [number, number] }) {
     if (!c || !body || gone) return
     const t = (performance.now() - c.start) / COLLECT_DURATION
     if (t >= 1) {
-      // 立即让碰撞体失效（sensor + 碰撞组清零，不依赖物理步进），再把刚体泊车到场外
+      // Immediately disable colliders (sensor + clear collision groups, no physics step needed), then park the rigid body off-screen
       for (let i = 0; i < body.numColliders(); i++) {
         const collider = body.collider(i)
         collider.setSensor(true)

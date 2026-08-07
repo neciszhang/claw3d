@@ -18,8 +18,8 @@ function normalizeAngle(a: number): number {
 type CineMode = 'none' | 'coin' | 'carry'
 
 /**
- * 轨道相机：受限旋转/缩放 + 四向吸附（FR-301~303），
- * 并带运镜导演：投币时推近投币口特写，抓到玩偶后跟拍移送出口。
+ * Orbit camera: limited rotate/zoom + four-way snap (FR-301~303),
+ * with cinematic direction: push in for coin-slot close-up on coin, follow the claw carrying the toy to the exit.
  */
 export function CameraRig() {
   const controls = useRef<OrbitControlsImpl>(null)
@@ -36,7 +36,7 @@ export function CameraRig() {
     const c = controls.current
     if (!c) return
     const onEnd = () => {
-      if (snap.current?.active) return // 吸附动画期间忽略（FR-303）
+      if (snap.current?.active) return // Ignore during snap animation (FR-303)
       if (cine.current.mode !== 'none' || cine.current.returning) return
       const az = c.getAzimuthalAngle()
       const target = Math.round(az / HALF_PI) * HALF_PI
@@ -55,7 +55,7 @@ export function CameraRig() {
     refs.cameraAzimuth = c.getAzimuthalAngle()
     const cam = state.camera
 
-    // —— 运镜导演 ——
+    // — Cinematic director —
     const store = useGameStore.getState()
     let want: CineMode = 'none'
     if (!prefersReducedMotion()) {
@@ -80,7 +80,7 @@ export function CameraRig() {
         tmpTgt.current.set(COIN_SLOT.x, COIN_SLOT.y + 0.05, COIN_SLOT.z)
         tmpPos.current.set(COIN_SLOT.x + 0.28, COIN_SLOT.y + 0.42, COIN_SLOT.z + 1.3)
       } else {
-        // 跟拍抓手与玩偶移向出口
+        // Follow the claw and toy as they move toward the exit
         tmpTgt.current.set(refs.clawPos.x, Math.max(0.15, refs.clawPos.y - 0.3), refs.clawPos.z)
         const az = refs.snappedAzimuth
         tmpPos.current.set(
@@ -120,7 +120,7 @@ export function CameraRig() {
       return
     }
 
-    // —— 四向吸附 ——
+    // — Four-way snap —
     const s = snap.current
     if (s?.active) {
       const dur = prefersReducedMotion() ? 1 : TIMING.cameraSnapDuration
@@ -135,7 +135,7 @@ export function CameraRig() {
         c.maxAzimuthAngle = Infinity
         s.active = false
         refs.snappedAzimuth = normalizeAngle(s.to)
-        // 方向索引：0 前(+z) 1 右(+x) 2 后(-z) 3 左(-x)
+        // Direction index: 0 front(+z) 1 right(+x) 2 back(-z) 3 left(-x)
         const idx = ((Math.round(s.to / HALF_PI) % 4) + 4) % 4
         const dir = ([0, 1, 2, 3] as const)[idx]
         const st = useGameStore.getState()

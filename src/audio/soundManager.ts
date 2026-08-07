@@ -20,7 +20,7 @@ class SoundManager {
     return this.ctx
   }
 
-  /** 首次用户交互后调用，遵守自动播放限制 */
+  /** Called after the first user interaction to comply with autoplay policies */
   unlock(): void {
     const ctx = this.ensureCtx()
     if (ctx && ctx.state === 'suspended') void ctx.resume()
@@ -104,11 +104,11 @@ class SoundManager {
     try {
       navigator.vibrate?.(pattern)
     } catch {
-      // 不支持时静默降级
+      // Silently degrade when unsupported
     }
   }
 
-  /** 轻量循环背景音（简单琶音垫） */
+  /** Lightweight looping background music (simple arpeggio pad) */
   syncMusic(): void {
     const on = useGameStore.getState().settings.music
     const ctx = this.ctx

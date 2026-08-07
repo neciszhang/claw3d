@@ -14,7 +14,7 @@ export const PHYSICS = {
   wallZFront: 0.82,
   wallZBack: -0.83,
   wallTop: 2.05,
-  // 出口滑道（机箱前右角的落洞）
+  // Exit chute (drop hole at front-right corner of the cabinet)
   hole: { minX: 0.16, maxX: 0.81, minZ: 0.39, maxZ: 0.84 },
   chuteFloorY: -0.58,
   guardWallTop: 0.42,
@@ -31,9 +31,9 @@ export const CLAW = {
   exitZ: 0.58,
   baseMoveSpeed: 1.5,
   minSpeedFactor: 0.25,
-  // 拉杆顶端吸附高度（固定天车内部，世界坐标）
+  // Rod top snap height (inside the fixed gantry, world coordinates)
   rodTopY: 1.95,
-  // 三爪传感器：围绕爪心的半径与高度（相对爪组原点）
+  // Three-prong sensor: radius and height around the claw center (relative to claw group origin)
   sensorRing: 0.2,
   sensorRingClosed: 0.055,
   sensorHeight: 0.07,
@@ -94,9 +94,9 @@ const dense: [number, number][] = [
 ]
 
 export const DIFFICULTY: Record<Difficulty, DifficultyPreset> = {
-  easy: { label: '简单', speedFactor: 0.8, sensorRadius: 0.085, layout: sparse },
-  normal: { label: '标准', speedFactor: 1.0, sensorRadius: 0.06, layout: normal },
-  hard: { label: '困难', speedFactor: 1.2, sensorRadius: 0.042, layout: dense },
+  easy: { label: 'Easy', speedFactor: 0.8, sensorRadius: 0.085, layout: sparse },
+  normal: { label: 'Normal', speedFactor: 1.0, sensorRadius: 0.06, layout: normal },
+  hard: { label: 'Hard', speedFactor: 1.2, sensorRadius: 0.042, layout: dense },
 }
 
 export const STORAGE_KEYS = {

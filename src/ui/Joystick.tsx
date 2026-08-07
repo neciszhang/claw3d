@@ -6,7 +6,7 @@ import { useT } from '../i18n'
 const SIZE = 120
 const KNOB = 52
 
-/** 左下虚拟摇杆：连续角度 + 力度（FR-201/202/204/205） */
+/** Bottom-left virtual joystick: continuous angle + magnitude (FR-201/202/204/205) */
 export function Joystick() {
   const baseRef = useRef<HTMLDivElement>(null)
   const knobRef = useRef<HTMLDivElement>(null)

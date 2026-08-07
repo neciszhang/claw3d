@@ -13,10 +13,10 @@ export function boxModelUrl(): string {
 }
 
 const W = PHYSICS
-/** 投币口：对准模型操作台前立面的投币贴图（红按钮下方） */
+/** Coin slot: aligned with the coin-slot texture on the cabinet's front panel (below the red button) */
 export const COIN_SLOT = { x: -0.21, y: -0.655, z: 1.365 }
 
-/** 机箱模型 + 静态碰撞体（四壁/底面/出口滑道/护栏），操作台摇杆/按钮联动输入 */
+/** Cabinet model + static colliders (walls / floor / exit chute / guard rails), control panel joystick/button linked to input */
 export function Machine() {
   const { scene } = useGLTF(boxModelUrl())
   const hand = useRef<THREE.Object3D | null>(null)
@@ -39,14 +39,14 @@ export function Machine() {
 
   useFrame((_, delta) => {
     const damp = 1 - Math.exp(-12 * delta)
-    // 操作台摇杆随移动方向倾斜
+    // Control panel joystick tilts toward the movement direction
     if (hand.current) {
       const targetX = refs.moveVec.z * 0.38
       const targetZ = -refs.moveVec.x * 0.38
       hand.current.rotation.x += (targetX - hand.current.rotation.x) * damp
       hand.current.rotation.z += (targetZ - hand.current.rotation.z) * damp
     }
-    // 红色按钮在投币完成、下降开始瞬间按下
+    // Red button presses down briefly when coin finishes and descent begins
     if (btn.current) {
       const grabbing = useGameStore.getState().status === 'GRABBING'
       const sinceDescend = performance.now() - refs.phaseStart
@@ -54,7 +54,7 @@ export function Machine() {
       const targetY = btnBaseY.current - (pressed ? 0.018 : 0)
       btn.current.position.y += (targetY - btn.current.position.y) * damp
     }
-    // 投币动画：进场/再来一次时金币飞向前立面投币口并水平插入
+    // Coin animation: on entry / replay the coin flies toward the front-panel coin slot and inserts horizontally
     if (coin.current) {
       if (useGameStore.getState().status === 'COIN') {
         const t = THREE.MathUtils.clamp(
@@ -96,7 +96,7 @@ export function Machine() {
   return (
     <>
       <primitive object={model} />
-      {/* 投币口：贴在模型投币贴图上的金色面板 + 竖直币缝 */}
+      {/* Coin slot: golden panel over the model's coin-slot texture + vertical coin slit */}
       <mesh position={[COIN_SLOT.x, COIN_SLOT.y, COIN_SLOT.z]}>
         <boxGeometry args={[0.1, 0.22, 0.014]} />
         <meshStandardMaterial color="#d8b04a" metalness={0.7} roughness={0.3} />
@@ -116,7 +116,7 @@ export function Machine() {
         />
       </mesh>
       <RigidBody type="fixed" colliders={false}>
-        {/* 底面：绕开出口洞的三块 */}
+        {/* Floor: three panels avoiding the exit hole */}
         <CuboidCollider
           args={[W.wallX, 0.05, (W.hole.minZ - W.wallZBack) / 2]}
           position={[0, W.floorY - 0.05, (W.hole.minZ + W.wallZBack) / 2]}
@@ -129,12 +129,12 @@ export function Machine() {
           args={[(W.wallX - W.hole.maxX) / 2, 0.05, (W.wallZFront - W.hole.minZ) / 2]}
           position={[(W.wallX + W.hole.maxX) / 2, W.floorY - 0.05, (W.wallZFront + W.hole.minZ) / 2]}
         />
-        {/* 四壁 */}
+        {/* Four walls */}
         <CuboidCollider args={[0.05, wallH, (W.wallZFront - W.wallZBack) / 2]} position={[-W.wallX - 0.05, wallCY, 0]} />
         <CuboidCollider args={[0.05, wallH, (W.wallZFront - W.wallZBack) / 2]} position={[W.wallX + 0.05, wallCY, 0]} />
         <CuboidCollider args={[W.wallX + 0.1, wallH, 0.05]} position={[0, wallCY, W.wallZBack - 0.05]} />
         <CuboidCollider args={[W.wallX + 0.1, wallH, 0.05]} position={[0, wallCY, W.wallZFront + 0.05]} />
-        {/* 出口滑道：四壁从槽底到护栏顶（对应模型 box2/3/4/6），底板在槽底 */}
+        {/* Exit chute: four walls from the slot bottom to the guard-rail top (matching model box2/3/4/6), floor at the slot bottom */}
         <CuboidCollider
           args={[holeW + 0.06, 0.03, (0.93 - W.hole.minZ) / 2 + 0.06]}
           position={[holeCX, W.chuteFloorY - 0.03, (0.93 + W.hole.minZ) / 2]}

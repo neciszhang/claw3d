@@ -1,4 +1,4 @@
-// 每帧读写的热数据，避免经过 React 状态触发重渲染
+// Hot data read/written every frame, bypassing React state to avoid re-renders
 export type GrabPhase =
   | 'idle'
   | 'descend'

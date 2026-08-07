@@ -3,7 +3,7 @@ import { useGameStore } from '../store/gameStore'
 import { refs } from '../store/refs'
 import { sound } from '../audio/soundManager'
 
-/** 桌面端键盘：WASD/方向键移动，空格/回车抓取，Esc 暂停（FR-206 / 11.3） */
+/** Desktop keyboard: WASD / arrow keys to move, Space / Enter to grab, Esc to pause (FR-206 / 11.3) */
 export function useKeyboard() {
   useEffect(() => {
     const pressed = new Set<string>()
@@ -23,7 +23,7 @@ export function useKeyboard() {
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
       if (target && ['INPUT', 'TEXTAREA', 'BUTTON'].includes(target.tagName) && ['Space', 'Enter'].includes(e.code)) {
-        return // 让按钮自身处理回车/空格
+        return // Let the button handle Enter/Space itself
       }
       const store = useGameStore.getState()
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS'].includes(e.code)) {

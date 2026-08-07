@@ -164,7 +164,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     get().insertCoin()
   },
 
-  /** 投币：消耗一枚金币进入 COIN 动画，结束后才可操作 */
+  /** Insert coin: consume one coin and enter the COIN animation; controls unlock when it finishes */
   insertCoin: () => {
     const { coins } = get()
     if (coins <= 0) {

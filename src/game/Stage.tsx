@@ -26,7 +26,7 @@ function makeCometTexture(): THREE.CanvasTexture {
   return tex
 }
 
-/** 流星：发光头 + 锥形渐隐尾焊成一体，从右上向左下斜划坠落 */
+/** Comets: glowing head + tapered fading tail welded together, streaking from upper-right to lower-left */
 function Comets() {
   const groups = useRef<(THREE.Group | null)[]>([])
   const tailTex = useMemo(makeCometTexture, [])
@@ -53,13 +53,13 @@ function Comets() {
       if (!g) continue
       if (!p.active) {
         g.visible = false
-        p.wait -= delta // 等待用真实时间，低帧率下也按时出现
+        p.wait -= delta // Use real time for waiting so comets appear on schedule even at low FPS
         if (p.wait <= 0) {
-          // 天边：地板圆盘之外的远环带，全 360° 随机方位
+          // Horizon: far ring band beyond the floor disc, random azimuth across 360°
           const theta = Math.random() * Math.PI * 2
           const R = 24 + Math.random() * 8
           p.pos.set(Math.cos(theta) * R, 7 + Math.random() * 6, Math.sin(theta) * R)
-          // 切向 + 下坠 → 任意视角都是斜划落
+          // Tangential + downward → streaks diagonally from any viewing angle
           const sh = 4 + Math.random() * 3
           const sv = 2.6 + Math.random() * 1.6
           p.vel.set(Math.sin(theta) * sh, -sv, -Math.cos(theta) * sh)
@@ -70,7 +70,7 @@ function Comets() {
         continue
       }
       p.pos.addScaledVector(p.vel, dt)
-      // 沉到地平线以下（被地板遡挡）再回收
+      // Sink below the horizon (occluded by the floor) before recycling
       if (p.pos.y < -6) {
         p.active = false
         p.wait = 0.5 + Math.random() * 2.5
@@ -92,7 +92,7 @@ function Comets() {
           }}
           visible={false}
         >
-          {/* 头：小光核 + 贴身光晕，尺寸与尾宽衔接成水滴状整体 */}
+          {/* Head: small light core + close glow halo, sized to blend with the tail into a teardrop shape */}
           <sprite scale={[0.5, 0.5, 1]}>
             <spriteMaterial
               map={coreTex}
@@ -113,7 +113,7 @@ function Comets() {
               opacity={0.65}
             />
           </sprite>
-          {/* 尾：宽头细尾锥形渐隐，顶端埋进光核内部，无缝一体 */}
+          {/* Tail: wide-to-narrow tapered cone fading out, top buried inside the light core for a seamless look */}
           <mesh position={[0, -3.42, 0]}>
             <cylinderGeometry args={[0.13, 0.004, 7.0, 10, 1, true]} />
             <meshBasicMaterial
@@ -133,7 +133,7 @@ function Comets() {
   )
 }
 
-/** 小地图渲染时隐藏舞台装饰，避免第二次全场景绘制的开销 */
+/** Hide stage decorations during minimap rendering to avoid the cost of a second full-scene draw */
 export const stageGroupRef: { current: THREE.Group | null } = { current: null }
 
 const QUAD_VERT = /* glsl */ `
@@ -144,7 +144,7 @@ const QUAD_VERT = /* glsl */ `
   }
 `
 
-/** 幻影星云底盘（改编自 Phantom Star by kaneta）：raymarch IFS 分形隧道，蓝紫体积光 */
+/** Phantom nebula floor (adapted from Phantom Star by kaneta): raymarched IFS fractal tunnel, blue-purple volumetric light */
 const BASE_WAVE_FRAG = /* glsl */ `
   precision highp float;
   uniform float uTime;
@@ -217,7 +217,7 @@ const BASE_WAVE_FRAG = /* glsl */ `
 
     vec3 col = vec3(acc * 0.0045, acc * 0.0065 + acc2 * 0.002, acc * 0.011 + acc2 * 0.006);
     float alpha = clamp(1.0 - t * 0.03, 0.0, 1.0) * 0.82;
-    // 圆盘边缘羽化，融入霓虹网格地面
+    // Feather the disc edge to blend into the neon grid floor
     alpha *= smoothstep(1.0, 0.7, rr);
     gl_FragColor = vec4(col, alpha);
   }
@@ -231,7 +231,7 @@ const PASS_VERT = /* glsl */ `
   }
 `
 
-/** 直通采样：跳过 three 的颜色空间编码，保持离屏 raymarch 的原始观感 */
+/** Pass-through sampling: skip three's color space encoding to preserve the raw look of off-screen raymarching */
 const PASS_FRAG = /* glsl */ `
   uniform sampler2D uMap;
   varying vec2 vUv;
@@ -240,7 +240,7 @@ const PASS_FRAG = /* glsl */ `
   }
 `
 
-/** 幻影底盘：raymarch 渲到低分辨率离屏纹理（片元量 ~1/20），隔帧刷新后贴回地面圆盘 */
+/** Phantom floor: raymarch to a low-res off-screen texture (~1/20 fragment count), refresh every other frame and map back to the floor disc */
 function PhantomFloor() {
   const quality = useGameStore((st) => st.settings.quality)
   const size = quality === 'high' ? 512 : 320
@@ -265,14 +265,14 @@ function PhantomFloor() {
   const frame = useRef(0)
   useEffect(() => () => rt.dispose(), [rt])
   useFrame(({ gl }, delta) => {
-    // 平时慢速流动；抓中后短暂加速，随后平滑回落
+    // Slow flow normally; briefly accelerate on a successful grab, then smoothly settle back
     let speed = 0.35
     if (refs.successPulseAt > 0) {
       const e = (performance.now() - refs.successPulseAt) / 1000
       if (e < 5) speed += 2.1 * Math.exp(-e * 1.1)
     }
     simT.current += Math.min(delta, 0.05) * speed
-    // 慢速流动隔帧刷新即可，再省一半 raymarch 开销
+    // Slow flow only needs every-other-frame refresh, halving raymarch cost
     frame.current++
     if (frame.current % 2 === 0) {
       quad.mat.uniforms.uTime.value = simT.current
@@ -341,18 +341,18 @@ const AURORA_FRAG = /* glsl */ `
   ${NOISE_GLSL}
   void main() {
     float h = vDir.y * 0.5 + 0.5;
-    // 底 → 顶渐变
+    // Bottom → top gradient
     vec3 base = mix(vec3(0.035, 0.023, 0.086), vec3(0.24, 0.14, 0.51), smoothstep(0.0, 0.9, h));
     base = mix(base, vec3(0.05, 0.03, 0.12), smoothstep(0.75, 1.0, h) * 0.6);
-    // 极光带：绕水平方向流动的 fbm
+    // Aurora band: fbm flowing around the horizontal direction
     float n = fbm(vec3(vDir.x * 1.6, vDir.y * 3.2 - uTime * 0.045, vDir.z * 1.6) + uTime * 0.012);
     float band = smoothstep(0.42, 0.62, n) * smoothstep(0.05, 0.35, h) * (1.0 - smoothstep(0.55, 0.95, h));
-    vec3 auroraA = vec3(1.0, 0.36, 0.54);  // 粉
-    vec3 auroraB = vec3(0.30, 0.85, 1.0);  // 青
+    vec3 auroraA = vec3(1.0, 0.36, 0.54);  // pink
+    vec3 auroraB = vec3(0.30, 0.85, 1.0);  // cyan
     float m = fbm(vec3(vDir.z * 1.2, vDir.x * 1.2, uTime * 0.03));
     vec3 aurora = mix(auroraA, auroraB, m);
     vec3 col = base + aurora * band * 0.4;
-    // 微弱星云亮斑
+    // Faint nebula glow
     float glow = pow(max(0.0, fbm(vDir * 2.4 + vec3(0.0, uTime * 0.008, 0.0)) - 0.45), 2.0);
     col += vec3(0.45, 0.35, 0.9) * glow * 0.5;
     gl_FragColor = vec4(col, 1.0);
@@ -374,7 +374,7 @@ function makeGlowTexture(color: string): THREE.CanvasTexture {
   return tex
 }
 
-/** 渐变天幕 + 霓虹网格地面 + 舞台底座 + 漂浮霓虹装饰，打造街机厅氛围 */
+/** Gradient sky dome + neon grid floor + stage base + floating neon decorations for an arcade ambiance */
 export function Stage() {
   const quality = useGameStore((s) => s.settings.quality)
 
@@ -412,7 +412,7 @@ export function Stage() {
         }
       }}
     >
-      {/* 渐变天幕：高画质用极光 shader，流畅档用静态渐变 */}
+      {/* Sky dome: aurora shader for high quality, static gradient for smooth mode */}
       <mesh>
         <sphereGeometry args={[32, 32, 16]} />
         {quality === 'high' ? (
@@ -436,7 +436,7 @@ export function Stage() {
         )}
       </mesh>
 
-      {/* 深色地面（遮挡地平线下的流星） */}
+      {/* Dark floor (occludes comets below the horizon) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.72, 0]}>
         <circleGeometry args={[22, 48]} />
         <meshBasicMaterial color="#0a0620" fog={false} toneMapped={false} />
@@ -444,7 +444,7 @@ export function Stage() {
 
       <PhantomFloor />
 
-      {/* 机箱背后辉光 */}
+      {/* Glow behind the cabinet */}
       <sprite position={[0, 0.6, -3.2]} scale={[10, 6, 1]}>
         <spriteMaterial
           map={glowPink}
@@ -464,11 +464,11 @@ export function Stage() {
         />
       </sprite>
 
-      {/* 两侧彩色补光 */}
+      {/* Colored fill lights on both sides */}
       <pointLight position={[-4, 1.5, 2]} intensity={6} distance={12} color="#4dd8ff" />
       <pointLight position={[4, 1.2, -2]} intensity={6} distance={12} color="#ff5c8a" />
 
-      {/* 舞台聚光 */}
+      {/* Stage spotlight */}
       <spotLight
         position={[0, 6.5, 3.5]}
         angle={0.45}
@@ -499,7 +499,7 @@ export function Stage() {
   )
 }
 
-/** 采样渲染统计供性能面板读取（每 500ms 汇总一次到 refs.perf） */
+/** Sample render stats for the performance panel (aggregated to refs.perf every 500ms) */
 export function PerfMonitor() {
   const enabled = useGameStore((s) => s.settings.perfPanel)
   const acc = useRef({ frames: 0, last: performance.now() })

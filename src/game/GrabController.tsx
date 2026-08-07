@@ -27,7 +27,7 @@ function setPhase(p: GrabPhase) {
   refs.phaseStart = performance.now()
 }
 
-/** 驱动摇杆移动与整个抓取时间线（FR-401~409） */
+/** Drives joystick movement and the entire grab timeline (FR-401~409) */
 export function GrabController() {
   const grabAnchor = useRef({
     x: 0,
@@ -43,13 +43,13 @@ export function GrabController() {
     const status = store.status
     const now = performance.now()
 
-    // —— 投币动画：结束后解锁操作 ——
+    // — Coin animation: unlock controls when done —
     if (status === 'COIN') {
       if (now - refs.coinStart >= TIMING.coinDuration) store.setStatus('READY')
       return
     }
 
-    // —— 移动（READY / MOVING，弹层打开时挂起）——
+    // — Movement (READY / MOVING; suspended when an overlay is open) —
     if (status === 'READY' || status === 'MOVING') {
       if (store.overlay !== 'none') {
         if (status === 'MOVING') store.setStatus('READY')
@@ -62,7 +62,7 @@ export function GrabController() {
       const mag = Math.min(1, Math.hypot(jx, jy))
       if (mag > 0.05) {
         const az = refs.snappedAzimuth
-        // 屏幕右 = (cos az, -sin az)，屏幕上 = (-sin az, -cos az)
+        // Screen right = (cos az, -sin az), screen up = (-sin az, -cos az)
         const up = -jy
         const wx = jx * Math.cos(az) + up * -Math.sin(az)
         const wz = jx * -Math.sin(az) + up * -Math.cos(az)
@@ -94,11 +94,11 @@ export function GrabController() {
 
     if (status !== 'GRABBING') return
 
-    // —— 超时保护（FR-408）——
+    // — Timeout protection (FR-408) —
     const phaseDur = PHASE_DURATION[refs.grabPhase]
     const elapsed = now - refs.phaseStart
     if (elapsed > phaseDur + TIMING.phaseTimeoutExtra) {
-      console.error('[claw] 抓取阶段超时，强制复位', refs.grabPhase)
+      console.error('[claw] Grab phase timeout, force reset', refs.grabPhase)
       releaseToy(true)
       refs.closeProgress = 0
       refs.clawPos.y = CLAW.restY
@@ -138,8 +138,8 @@ export function GrabController() {
               body.setBodyType(2, true) // KinematicPositionBased
               useGameStore.getState().setToyStatus(candidate, 'held')
             } else {
-              // 玩偶引用失效：本轮按失败处理
-              console.error('[claw] 玩偶刚体引用失效', candidate)
+              // Toy reference lost: treat this round as a failure
+              console.error('[claw] Toy rigid body reference lost', candidate)
               refs.candidateToyId = -1
             }
           }
@@ -152,7 +152,7 @@ export function GrabController() {
         const held = refs.candidateToyId >= 0
         if (!held) refs.closeProgress = Math.max(0, 1 - t * 2.5)
         if (held) {
-          // 前半程把玩偶从抓取点平滑拉入爪心，避免瞬移
+          // Smoothly pull the toy from the grab point into the claw center during the first half, avoiding teleport
           const a = grabAnchor.current
           const k = easeInOut(Math.min(1, t * 2))
           a.off.x = THREE.MathUtils.lerp(a.off0.x, 0, k)
@@ -175,7 +175,7 @@ export function GrabController() {
         break
       }
       case 'toExit': {
-        // 依次移动：前半段 X，后半段 Z（FR-406）
+        // Move sequentially: first half X, second half Z (FR-406)
         const tx = clamp01(t * 2)
         const tz = clamp01(t * 2 - 1)
         refs.clawPos.x = THREE.MathUtils.lerp(grabAnchor.current.x, CLAW.exitX, easeInOut(tx))
@@ -193,7 +193,7 @@ export function GrabController() {
         break
       }
       case 'settle': {
-        // 玩偶可能弹回场内：只有真正落入出口滑道才算抓到
+        // Toy may bounce back into the pit: only counts as a grab if it truly enters the exit chute
         const id = refs.candidateToyId
         const body = id >= 0 ? toyRegistry.get(id) : undefined
         if (!body) {
@@ -206,7 +206,7 @@ export function GrabController() {
           break
         }
         const pos = body.translation()
-        // 中心低于箱底面且在洞口范围内：已进入滑道井道，不可能弹回场内
+        // Center below the cabinet floor and within the hole boundary: entered the chute shaft, cannot bounce back
         const inChute =
           pos.y < -0.12 &&
           pos.x > PHYSICS.hole.minX &&
@@ -219,7 +219,7 @@ export function GrabController() {
           useGameStore.getState().setToyStatus(id, inChute ? 'out' : 'inBox')
           if (inChute) {
             sound.play('drop')
-            // 镜头拉回全景时触发地面爆发特效
+            // Trigger ground burst effect when the camera pulls back to panoramic view
             refs.successPulseAt = performance.now()
           }
           refs.candidateToyId = -1
@@ -254,7 +254,7 @@ export function GrabController() {
   return null
 }
 
-/** 三个爪的命中集合取交集，全部命中同一玩偶才算成功候选 */
+/** Intersect the hit sets of all three prongs; a toy hit by all three is a valid candidate */
 function judgeCandidate(): number {
   const [a, b, c] = refs.clawHits
   for (const id of a) {
@@ -271,7 +271,7 @@ function followToy(off: { x: number; y: number; z: number }) {
   if (id < 0) return
   const body = toyRegistry.get(id)
   if (!body) return
-  // 睡眠的 kinematic 刚体会被跳过 mesh 同步，必须保持唤醒
+  // Sleeping kinematic bodies skip mesh sync, so keep them awake
   body.wakeUp()
   body.setNextKinematicTranslation({
     x: refs.clawPos.x + off.x,

@@ -12,7 +12,7 @@ export function storageSet(key: string, value: unknown): void {
   try {
     window.localStorage.setItem(key, JSON.stringify(value))
   } catch {
-    // 存储不可用时静默降级（FR: 本地存储不可用）
+    // Silently degrade when storage is unavailable (FR: local storage unavailable)
   }
 }
 

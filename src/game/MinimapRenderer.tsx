@@ -6,20 +6,20 @@ import { useGameStore } from '../store/gameStore'
 import { refs } from '../store/refs'
 import { stageGroupRef } from './Stage'
 
-/** 小地图布局（CSS px），UI 边框层与 scissor 渲染共用 */
+/** Minimap layout (CSS px), shared by the UI border layer and scissor rendering */
 export function minimapLayout(viewportW: number): { size: number; top: number; right: number } {
   const size = Math.min(RENDER.minimapMaxSize, Math.round(viewportW * 0.3))
   return { size, top: 56, right: 10 }
 }
 
 /**
- * 接管渲染循环：主相机全屏渲染 + 右上角正交俯视小地图（FR-304~306）。
- * 小地图 up 方向跟随主相机方位角旋转。
+ * Takes over the render loop: full-screen main camera render + top-right orthographic top-down minimap (FR-304~306).
+ * The minimap's up direction rotates with the main camera's azimuth.
  */
 export function MinimapRenderer() {
   const { gl, scene, camera, size } = useThree()
   const orthoCam = useMemo(() => {
-    // near/far 裁剪掉机箱顶盖，只俯视内部（y ∈ [-0.8, 1.55]）
+    // near/far clip out the cabinet top so we only look down into the interior (y ∈ [-0.8, 1.55])
     const cam = new THREE.OrthographicCamera(-1.05, 1.05, 1.05, -1.05, 3.45, 5.8)
     cam.position.set(0, 5, 0)
     return cam
@@ -33,7 +33,7 @@ export function MinimapRenderer() {
     gl.render(scene, camera)
 
     if (!minimapOn) return
-    // setViewport/setScissor 接收 CSS 像素，three 内部会乘 pixelRatio
+    // setViewport/setScissor take CSS pixels; three multiplies by pixelRatio internally
     const { size: mmSize, top, right } = minimapLayout(size.width)
     const px = Math.round(size.width - right - mmSize)
     const py = Math.round(size.height - top - mmSize)
@@ -44,7 +44,7 @@ export function MinimapRenderer() {
     orthoCam.lookAt(0, 0, 0)
     orthoCam.updateProjectionMatrix()
 
-    // 第二次渲染只画机箱内部：隐藏舞台装饰并冻结阴影贴图重算
+    // Second render pass only draws the cabinet interior: hide stage decorations and freeze shadow map updates
     const stage = stageGroupRef.current
     const prevStageVisible = stage?.visible ?? true
     const prevShadowAuto = gl.shadowMap.autoUpdate

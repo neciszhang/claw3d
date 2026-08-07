@@ -4,7 +4,7 @@ A 3D claw machine web game built with React + Three.js + the Rapier physics engi
 
 ## Live Preview
 
-> Live preview link: [coming soon](#) (replace this link after deployment, e.g. GitHub Pages / Vercel)
+> Live preview link: https://neciszhang.github.io/claw3d/
 
 ## Screenshot
 

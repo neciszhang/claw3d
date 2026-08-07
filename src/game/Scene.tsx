@@ -12,7 +12,7 @@ import { MinimapRenderer } from './MinimapRenderer'
 import { PerfMonitor, Stage } from './Stage'
 import { Toys, toyRegistry } from './Toys'
 
-/** 所有 3D 资源加载完成后（Suspense 解除）通知状态机 */
+/** Notify the state machine once all 3D assets are loaded (Suspense resolved) */
 function LoadedSignal() {
   const status = useGameStore((s) => s.status)
   const finishLoading = useGameStore((s) => s.finishLoading)
@@ -22,7 +22,7 @@ function LoadedSignal() {
   return null
 }
 
-/** RESETTING：复位抓手并通知重建完成（FR-106 / FR-505） */
+/** RESETTING: reset the claw and notify that rebuild is complete (FR-106 / FR-505) */
 function ResetHandler() {
   const status = useGameStore((s) => s.status)
   const finishReset = useGameStore((s) => s.finishReset)
@@ -39,7 +39,7 @@ function ResetHandler() {
   return null
 }
 
-/** 场景静止（无移动/抓取且玩偶全部休眠）时冻结阴影贴图重算 */
+/** Freeze shadow map updates when the scene is idle (no movement/grab and all toys sleeping) */
 function ShadowController() {
   const lastActive = useRef(performance.now())
   useFrame(({ gl }) => {

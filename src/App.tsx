@@ -35,7 +35,7 @@ export default function App() {
 
   useKeyboard()
 
-  // BOOT：环境检测（FR-001）
+  // BOOT: environment detection (FR-001)
   useEffect(() => {
     if (useGameStore.getState().status !== 'BOOT') return
     const { ok, reason } = detectWebGL()
@@ -49,7 +49,7 @@ export default function App() {
     document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en'
   }, [language])
 
-  // 投币音效：进入 COIN 状态统一播放
+  // Coin sound: played uniformly when entering COIN state
   useEffect(() => {
     if (status === 'COIN') {
       sound.play('coin')
@@ -57,7 +57,7 @@ export default function App() {
     }
   }, [status])
 
-  // 首次交互解锁音频；切后台停音乐并清输入
+  // Unlock audio on first interaction; stop music and clear input when tab is hidden
   useEffect(() => {
     const unlock = () => sound.unlock()
     const onVisibility = () => {

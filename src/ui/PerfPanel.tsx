@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { refs } from '../store/refs'
 
-/** 左下角性能面板：FPS / 帧耗时 / DrawCall / 三角形数 */
+/** Bottom-left performance panel: FPS / frame time / draw calls / triangles */
 export function PerfPanel() {
   const enabled = useGameStore((s) => s.settings.perfPanel)
   const [, force] = useState(0)
