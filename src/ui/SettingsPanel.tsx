@@ -67,6 +67,7 @@ export function SettingsPanel() {
         <Toggle label={S.sfx} value={settings.sfx} onChange={(v) => updateSettings({ sfx: v })} onText={S.on} offText={S.off} />
         <Toggle label={S.vibration} value={settings.vibration} onChange={(v) => updateSettings({ vibration: v })} onText={S.on} offText={S.off} />
         <Toggle label={S.minimap} value={settings.minimap} onChange={(v) => updateSettings({ minimap: v })} onText={S.on} offText={S.off} />
+        <Toggle label={S.steadyGrip} value={settings.steadyGrip} onChange={(v) => updateSettings({ steadyGrip: v })} onText={S.on} offText={S.off} />
         <Toggle label={S.debug} value={settings.debug} onChange={(v) => updateSettings({ debug: v })} onText={S.on} offText={S.off} />
         <Toggle label={S.perf} value={settings.perfPanel} onChange={(v) => updateSettings({ perfPanel: v })} onText={S.on} offText={S.off} />
         <label className="setting-row">

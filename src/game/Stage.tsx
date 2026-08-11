@@ -298,6 +298,75 @@ function PhantomFloor() {
   )
 }
 
+/** Equirect variant of the aurora shader: reconstructs view direction from quad UV */
+const AURORA_QUAD_FRAG_HEAD = /* glsl */ `
+  varying vec2 vUv;
+  uniform float uTime;
+`
+
+/**
+ * Offscreen aurora dome: the fbm shader is expensive at full resolution (3 fbm calls
+ * per pixel over most of the screen at dpr 1.5). Render it into a small equirect
+ * render target every 3rd frame and let the dome simply sample the texture.
+ */
+function AuroraDome() {
+  const rt = useMemo(
+    () => new THREE.WebGLRenderTarget(512, 256, { depthBuffer: false, stencilBuffer: false }),
+    [],
+  )
+  const quad = useMemo(() => {
+    const scene = new THREE.Scene()
+    const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+    const frag =
+      AURORA_QUAD_FRAG_HEAD +
+      NOISE_GLSL +
+      AURORA_FRAG.slice(AURORA_FRAG.indexOf('void main'))
+        .replace(
+          'void main() {',
+          `void main() {
+    float phi = vUv.x * 6.2831853;
+    float thetaV = (1.0 - vUv.y) * 3.14159265;
+    vec3 vDir = vec3(sin(thetaV) * cos(phi), cos(thetaV), sin(thetaV) * sin(phi));`,
+        )
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: QUAD_VERT,
+      fragmentShader: frag,
+      uniforms: { uTime: { value: 0 } },
+      depthTest: false,
+      depthWrite: false,
+    })
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat))
+    return { scene, cam, mat }
+  }, [])
+  const passUniforms = useMemo(() => ({ uMap: { value: rt.texture } }), [rt])
+  const frame = useRef(0)
+  useEffect(() => () => rt.dispose(), [rt])
+  useFrame(({ gl, clock }) => {
+    // Aurora drifts slowly; refreshing every 3rd frame is imperceptible
+    frame.current++
+    if (frame.current % 3 !== 0) return
+    quad.mat.uniforms.uTime.value = clock.elapsedTime
+    const prev = gl.getRenderTarget()
+    gl.setRenderTarget(rt)
+    gl.render(quad.scene, quad.cam)
+    gl.setRenderTarget(prev)
+  })
+  return (
+    <mesh>
+      <sphereGeometry args={[32, 32, 16]} />
+      <shaderMaterial
+        vertexShader={PASS_VERT}
+        fragmentShader={PASS_FRAG}
+        uniforms={passUniforms}
+        side={THREE.BackSide}
+        depthWrite={false}
+        toneMapped={false}
+        fog={false}
+      />
+    </mesh>
+  )
+}
+
 const NOISE_GLSL = /* glsl */ `
   float hash(vec3 p) {
     p = fract(p * 0.3183099 + 0.1);
@@ -324,14 +393,6 @@ const NOISE_GLSL = /* glsl */ `
       a *= 0.5;
     }
     return v;
-  }
-`
-
-const AURORA_VERT = /* glsl */ `
-  varying vec3 vDir;
-  void main() {
-    vDir = normalize(position);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `
 
@@ -397,11 +458,7 @@ export function Stage() {
 
   const glowPink = useMemo(() => makeGlowTexture('rgba(255, 92, 138, 0.55)'), [])
   const glowCyan = useMemo(() => makeGlowTexture('rgba(77, 216, 255, 0.4)'), [])
-  const auroraUniforms = useMemo(() => ({ uTime: { value: 0 } }), [])
 
-  useFrame(({ clock }) => {
-    auroraUniforms.uTime.value = clock.elapsedTime
-  })
 
   return (
     <group
@@ -412,20 +469,12 @@ export function Stage() {
         }
       }}
     >
-      {/* Sky dome: aurora shader for high quality, static gradient for smooth mode */}
-      <mesh>
-        <sphereGeometry args={[32, 32, 16]} />
-        {quality === 'high' ? (
-          <shaderMaterial
-            vertexShader={AURORA_VERT}
-            fragmentShader={AURORA_FRAG}
-            uniforms={auroraUniforms}
-            side={THREE.BackSide}
-            depthWrite={false}
-            fog={false}
-            toneMapped={false}
-          />
-        ) : (
+      {/* Sky dome: offscreen aurora render target on high quality, static gradient on smooth */}
+      {quality === 'high' ? (
+        <AuroraDome />
+      ) : (
+        <mesh>
+          <sphereGeometry args={[32, 32, 16]} />
           <meshBasicMaterial
             map={domeTexture}
             side={THREE.BackSide}
@@ -433,8 +482,8 @@ export function Stage() {
             toneMapped={false}
             fog={false}
           />
-        )}
-      </mesh>
+        </mesh>
+      )}
 
       {/* Dark floor (occludes comets below the horizon) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.72, 0]}>

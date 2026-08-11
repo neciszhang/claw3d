@@ -43,6 +43,14 @@ export const CLAW = {
 
 export const COIN = {
   perGame: 15,
+  dailyBonus: 5, // coins granted on first entry each day
+  winReward: 1, // coins returned per win (must stay below the per-round cost to avoid inflation)
+}
+
+/** Grip & slip: mimics real arcade machines — the toy may slip randomly while rising/carrying, independent of aim */
+export const GRIP = {
+  slipChance: 0.45, // fixed probability of slipping after each successful grab
+  pityAfter: 2, // after N consecutive slips the grip locks and the next catch holds (payout cycle)
 }
 
 export const TIMING = {
@@ -105,4 +113,5 @@ export const STORAGE_KEYS = {
   settings: 'claw3d.settings.v1',
   stats: 'claw3d.stats.v1',
   tutorial: 'claw3d.tutorialDone.v1',
+  wallet: 'claw3d.wallet.v1',
 }

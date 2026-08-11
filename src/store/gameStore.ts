@@ -16,6 +16,7 @@ export type GameStatus =
   | 'LOADING'
   | 'TUTORIAL'
   | 'COIN'
+  | 'UNPAID'
   | 'READY'
   | 'MOVING'
   | 'CAMERA_SNAP'
@@ -44,6 +45,8 @@ export interface Settings {
   debug: boolean
   perfPanel: boolean
   language: 'en' | 'zh'
+  /** Steady-grip mode: a grabbed toy never slips (assist/demo) */
+  steadyGrip: boolean
 }
 
 export interface RoundRecord {
@@ -69,6 +72,7 @@ const defaultSettings: Settings = {
   debug: false,
   perfPanel: false,
   language: 'en',
+  steadyGrip: false,
 }
 
 const defaultStats: Stats = { attempts: 0, successes: 0, fastestTime: null, recent: [] }
@@ -89,7 +93,9 @@ interface GameStore {
   attempts: number
   successes: number
   coins: number
-  resultInfo: { result: 'success' | 'fail'; timeMs: number; bounced?: boolean } | null
+  dailyBonus: number
+  coinHint: number
+  resultInfo: { result: 'success' | 'fail'; timeMs: number; bounced?: boolean; slipped?: boolean } | null
   overlay: Overlay
   loadError: string | null
   resetNonce: number
@@ -109,11 +115,14 @@ interface GameStore {
   setCameraDirection: (d: 0 | 1 | 2 | 3) => void
   startGrab: () => boolean
   insertCoin: () => boolean
-  finishRound: (result: 'success' | 'fail', timeMs: number, bounced?: boolean) => void
+  finishRound: (result: 'success' | 'fail', timeMs: number, bounced?: boolean, slipped?: boolean) => void
   setToyStatus: (id: number, status: ToyMeta['status']) => void
   playAgain: () => void
+  closeResult: () => void
   restartGame: () => void
   finishReset: () => void
+  clearDailyBonus: () => void
+  askCoin: () => void
   pause: () => void
   resume: () => void
   openOverlay: (o: Overlay) => void
@@ -124,6 +133,25 @@ interface GameStore {
   retryFromError: () => void
 }
 
+/** Local wallet: coins persist across sessions; a daily bonus is granted on first entry each day */
+function localDay(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+}
+const initialWallet = (() => {
+  const w = storageGet(STORAGE_KEYS.wallet, { coins: COIN.perGame, lastBonusDay: '' })
+  const today = localDay()
+  const bonus = w.lastBonusDay === today ? 0 : COIN.dailyBonus
+  // Bankruptcy relief: top up to 5 coins on entry (after the daily bonus) so the game never soft-locks
+  const coins = Math.max(w.coins + bonus, 5)
+  storageSet(STORAGE_KEYS.wallet, { coins, lastBonusDay: today })
+  return { coins, bonus }
+})()
+function persistCoins(coins: number): void {
+  const w = storageGet(STORAGE_KEYS.wallet, { coins, lastBonusDay: localDay() })
+  storageSet(STORAGE_KEYS.wallet, { coins, lastBonusDay: w.lastBonusDay || localDay() })
+}
+
 export const useGameStore = create<GameStore>((set, get) => ({
   status: 'BOOT',
   statusBeforePause: 'READY',
@@ -131,7 +159,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   toys: buildToys(storageGet(STORAGE_KEYS.settings, defaultSettings).difficulty),
   attempts: 0,
   successes: 0,
-  coins: COIN.perGame,
+  coins: initialWallet.coins,
+  dailyBonus: initialWallet.bonus,
+  coinHint: 0,
   resultInfo: null,
   overlay: 'none',
   loadError: null,
@@ -150,8 +180,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   finishLoading: () => {
     const { tutorialDone } = get()
     if (tutorialDone) {
-      get().insertCoin()
-      set({ tutorialStep: 0, loadError: null })
+      // No auto-coin on entry: wait for the player to press 'Insert'
+      set({ status: 'UNPAID', tutorialStep: 0, loadError: null })
     } else {
       set({ status: 'TUTORIAL', tutorialStep: 0, loadError: null })
     }
@@ -160,18 +190,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setTutorialStep: (n) => set({ tutorialStep: n }),
   finishTutorial: () => {
     storageSet(STORAGE_KEYS.tutorial, { done: true })
-    set({ tutorialDone: true })
-    get().insertCoin()
+    set({ tutorialDone: true, status: 'UNPAID' })
   },
 
   /** Insert coin: consume one coin and enter the COIN animation; controls unlock when it finishes */
   insertCoin: () => {
     const { coins } = get()
     if (coins <= 0) {
-      set({ status: 'READY' })
+      set({ status: 'UNPAID' })
       return false
     }
     refs.coinStart = performance.now()
+    persistCoins(coins - 1)
     set({ status: 'COIN', coins: coins - 1 })
     return true
   },
@@ -191,8 +221,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return true
   },
 
-  finishRound: (result, timeMs, bounced) => {
-    const { stats, attempts, successes } = get()
+  finishRound: (result, timeMs, bounced, slipped) => {
+    const { stats, attempts, successes, coins } = get()
     const record: RoundRecord = { result, timeMs, at: Date.now() }
     const nextStats: Stats = {
       attempts: stats.attempts + 1,
@@ -206,11 +236,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       recent: [record, ...stats.recent].slice(0, 10),
     }
     storageSet(STORAGE_KEYS.stats, nextStats)
+    // Reward coins on a win to encourage another round
+    const nextCoins = result === 'success' ? coins + COIN.winReward : coins
+    if (nextCoins !== coins) persistCoins(nextCoins)
     set({
       status: 'RESULT',
-      resultInfo: { result, timeMs, bounced },
+      resultInfo: { result, timeMs, bounced, slipped },
       attempts: attempts + 1,
       successes: successes + (result === 'success' ? 1 : 0),
+      coins: nextCoins,
       stats: nextStats,
     })
   },
@@ -229,10 +263,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     get().insertCoin()
   },
 
+  /** Close the result modal without paying: enter the unpaid state; pressing 'Insert' resumes play */
+  closeResult: () => set({ resultInfo: null, status: 'UNPAID' }),
+
   restartGame: () => {
-    const { settings } = get()
+    const { settings, coins } = get()
     clearMovementInput()
     resetRoundRefs()
+    // Coins live in the persistent wallet: restarting never resets them, only applies bankruptcy relief
+    const nextCoins = Math.max(coins, 5)
+    if (nextCoins !== coins) persistCoins(nextCoins)
     set((st) => ({
       status: 'RESETTING',
       overlay: 'none',
@@ -240,13 +280,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
       toys: buildToys(settings.difficulty),
       attempts: 0,
       successes: 0,
-      coins: COIN.perGame,
+      coins: nextCoins,
       resetNonce: st.resetNonce + 1,
     }))
   },
 
+  clearDailyBonus: () => set({ dailyBonus: 0 }),
+
+  /** Joystick touched without a coin: remind the player to insert one (throttled to 1.5s) */
+  askCoin: () => {
+    const now = Date.now()
+    if (now - get().coinHint > 1500) set({ coinHint: now })
+  },
+
   finishReset: () => {
-    if (get().status === 'RESETTING') get().insertCoin()
+    if (get().status === 'RESETTING') set({ status: 'UNPAID' })
   },
 
   pause: () => {
@@ -285,4 +333,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
 export function remainingToys(toys: ToyMeta[]): number {
   return toys.filter((t) => t.status === 'inBox').length
+}
+
+// Expose the store for automated tests/debugging (dev only)
+if (import.meta.env.DEV) {
+  ;(window as unknown as { __gameStore?: typeof useGameStore }).__gameStore = useGameStore
 }

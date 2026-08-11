@@ -14,8 +14,19 @@ export function HUD() {
   const updateSettings = useGameStore((s) => s.updateSettings)
   const pause = useGameStore((s) => s.pause)
   const openOverlay = useGameStore((s) => s.openOverlay)
+  const dailyBonus = useGameStore((s) => s.dailyBonus)
+  const clearDailyBonus = useGameStore((s) => s.clearDailyBonus)
   const t = useT()
   const [vw, setVw] = useState(() => window.innerWidth)
+
+  // Daily bonus toast: wait until the player reaches the playable screen, then show for 4s (avoid being covered by the tutorial modal)
+  const bonusVisible =
+    dailyBonus > 0 && (status === 'READY' || status === 'MOVING' || status === 'COIN')
+  useEffect(() => {
+    if (!bonusVisible) return
+    const id = window.setTimeout(clearDailyBonus, 4000)
+    return () => window.clearTimeout(id)
+  }, [bonusVisible, clearDailyBonus])
 
   useEffect(() => {
     const onResize = () => setVw(window.innerWidth)
@@ -28,7 +39,7 @@ export function HUD() {
   }, [])
 
   const mm = minimapLayout(vw)
-  const canPause = status === 'READY' || status === 'MOVING'
+  const canPause = status === 'READY' || status === 'MOVING' || status === 'UNPAID'
 
   return (
     <>
@@ -103,6 +114,11 @@ export function HUD() {
           </button>
         </div>
       </div>
+      {bonusVisible && (
+        <div className="daily-bonus-toast" role="status">
+          {t.hud.dailyBonus(dailyBonus)}
+        </div>
+      )}
       {settings.minimap && (
         <div
           className="minimap-frame"

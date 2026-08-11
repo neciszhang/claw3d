@@ -1,6 +1,6 @@
 import { useGameStore } from '../store/gameStore'
 
-type SfxName = 'click' | 'coin' | 'descend' | 'close' | 'success' | 'fail' | 'drop'
+type SfxName = 'click' | 'coin' | 'descend' | 'close' | 'success' | 'fail' | 'drop' | 'slip'
 
 class SoundManager {
   private ctx: AudioContext | null = null
@@ -95,6 +95,11 @@ class SoundManager {
       case 'drop':
         this.noise(0.18, 0.14)
         this.tone(90, 0.22, { type: 'sine', gain: 0.16 })
+        break
+      case 'slip':
+        this.noise(0.1, 0.07)
+        this.tone(430, 0.3, { type: 'triangle', slideTo: 130, gain: 0.1 })
+        this.tone(70, 0.16, { type: 'sine', gain: 0.12, delay: 0.24 })
         break
     }
   }

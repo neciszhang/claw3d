@@ -31,6 +31,7 @@ export function Joystick() {
       }
       const st = useGameStore.getState().status
       if (st !== 'READY' && st !== 'MOVING') {
+        if (st === 'UNPAID') useGameStore.getState().askCoin()
         dx = 0
         dy = 0
       }

@@ -1,6 +1,8 @@
 import { remainingToys, useGameStore } from '../store/gameStore'
 import { sound } from '../audio/soundManager'
 import { useT } from '../i18n'
+import { refs } from '../store/refs'
+import { GRIP, COIN } from '../config/gameConfig'
 
 export function ResultModal() {
   const resultInfo = useGameStore((s) => s.resultInfo)
@@ -8,6 +10,7 @@ export function ResultModal() {
   const toys = useGameStore((s) => s.toys)
   const coins = useGameStore((s) => s.coins)
   const playAgain = useGameStore((s) => s.playAgain)
+  const closeResult = useGameStore((s) => s.closeResult)
   const openOverlay = useGameStore((s) => s.openOverlay)
   const t = useT()
   if (!resultInfo) return null
@@ -17,6 +20,16 @@ export function ResultModal() {
   return (
     <div className="modal-backdrop see-through" role="dialog" aria-modal="true" aria-label={t.result.aria}>
       <div className={`modal result-card ${ok ? 'success' : 'fail'}`}>
+        <button
+          className="modal-close"
+          aria-label="close"
+          onClick={() => {
+            sound.play('click')
+            closeResult()
+          }}
+        >
+          ✕
+        </button>
         <div className="result-icon" aria-hidden>
           {ok ? '🎉' : '💨'}
         </div>
@@ -24,10 +37,16 @@ export function ResultModal() {
         <p>
           {ok
             ? t.result.successBody(t.result.seconds((resultInfo.timeMs / 1000).toFixed(1)), successes, remaining)
-            : resultInfo.bounced
-              ? t.result.bounced
-              : t.result.failBody}
+            : resultInfo.slipped
+              ? t.result.slipped
+              : resultInfo.bounced
+                ? t.result.bounced
+                : t.result.failBody}
         </p>
+        {ok && <p className="hint-text">{t.result.coinReward(COIN.winReward)}</p>}
+        {!ok && refs.slipStreak >= GRIP.pityAfter && (
+          <p className="hint-text">{t.result.pityReady}</p>
+        )}
         {coins === 0 && <p className="hint-text">{t.result.noCoins}</p>}
         <div className="btn-row">
           <button

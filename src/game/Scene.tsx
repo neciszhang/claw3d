@@ -77,7 +77,7 @@ export function Scene() {
         position={[2.5, 4, 2]}
         intensity={2.2}
         castShadow={quality === 'high'}
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[512, 512]}
         shadow-camera-left={-2}
         shadow-camera-right={2}
         shadow-camera-top={3}

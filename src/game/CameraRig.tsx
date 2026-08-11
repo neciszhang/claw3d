@@ -15,6 +15,16 @@ function normalizeAngle(a: number): number {
   return Math.atan2(Math.sin(a), Math.cos(a))
 }
 
+/** Small camera shake when the toy slips (380ms decay) */
+function applyShake(cam: THREE.Camera) {
+  if (refs.shakeAt <= 0 || prefersReducedMotion()) return
+  const e = performance.now() - refs.shakeAt
+  if (e >= 380) return
+  const a = 0.05 * (1 - e / 380)
+  cam.position.x += Math.sin(e * 0.11) * a
+  cam.position.y += Math.sin(e * 0.147 + 1.7) * a * 0.7
+}
+
 type CineMode = 'none' | 'coin' | 'carry'
 
 /**
@@ -92,6 +102,7 @@ export function CameraRig() {
       cam.position.lerp(tmpPos.current, k)
       c.target.lerp(tmpTgt.current, k)
       cam.lookAt(c.target)
+      applyShake(cam)
       return
     }
 
@@ -143,6 +154,7 @@ export function CameraRig() {
         if (st.status === 'CAMERA_SNAP') st.setStatus('READY')
       }
     }
+    applyShake(cam)
   })
 
   return (

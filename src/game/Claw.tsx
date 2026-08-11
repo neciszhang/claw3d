@@ -181,8 +181,9 @@ export function Claw() {
           }}
           position={[Math.cos((i * Math.PI * 2) / 3) * CLAW.sensorRing, CLAW.restY, Math.sin((i * Math.PI * 2) / 3) * CLAW.sensorRing]}
         >
-          {/* Solid small collider: physically pushes toys when the claw closes */}
-          <BallCollider args={[0.035]} />
+          {/* Solid prong bodies: tip + finger segments physically push toys while closing (ported from the legacy convex-prong feel) */}
+          <BallCollider args={[0.055]} />
+          <BallCollider args={[0.045]} position={[0, 0.085, 0]} />
           <BallCollider
             args={[sensorRadius]}
             sensor

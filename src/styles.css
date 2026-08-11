@@ -391,11 +391,28 @@ body {
 .modal-backdrop.see-through {
   background: rgba(8, 4, 20, 0.12);
   backdrop-filter: none;
-  align-items: flex-start;
-  padding-top: max(11vh, calc(64px + env(safe-area-inset-top)));
+}
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #cfc6ec;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .modal {
+  position: relative;
   width: min(360px, 92vw);
   max-height: 82vh;
   overflow-y: auto;
@@ -782,4 +799,58 @@ button:focus-visible {
   .perf-panel {
     left: calc(50% - 330px);
   }
+}
+
+.daily-bonus-toast {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(120deg, #ffd257, #ff8f3d);
+  color: #3a230a;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  box-shadow: 0 6px 24px rgba(255, 180, 60, 0.45);
+  z-index: 40;
+  animation: bonusPop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+  pointer-events: none;
+}
+
+@keyframes bonusPop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-14px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+.coin-hint {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 40%;
+  background: rgba(20, 12, 44, 0.92);
+  border: 1px solid rgba(255, 210, 87, 0.6);
+  color: #ffd257;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 12px 22px;
+  border-radius: 12px;
+  z-index: 30;
+  animation: bonusPop 0.3s cubic-bezier(0.2, 1.4, 0.4, 1);
+  pointer-events: none;
+}
+
+.start-btn.attention {
+  animation: coinAttention 0.55s ease-in-out 2;
+}
+
+@keyframes coinAttention {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.12); box-shadow: 0 0 32px rgba(255, 210, 87, 0.8); }
 }

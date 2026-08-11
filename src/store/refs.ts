@@ -25,6 +25,8 @@ interface HotRefs {
   clawHits: [Set<number>, Set<number>, Set<number>]
   roundStartedAt: number
   successPulseAt: number
+  shakeAt: number
+  slipStreak: number
   perf: { fps: number; ms: number; drawCalls: number; triangles: number }
 }
 
@@ -43,6 +45,8 @@ export const refs: HotRefs = {
   clawHits: [new Set(), new Set(), new Set()],
   roundStartedAt: 0,
   successPulseAt: 0,
+  shakeAt: 0,
+  slipStreak: 0,
   perf: { fps: 0, ms: 0, drawCalls: 0, triangles: 0 },
 }
 

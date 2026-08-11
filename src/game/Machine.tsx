@@ -102,11 +102,11 @@ export function Machine() {
         <meshStandardMaterial color="#d8b04a" metalness={0.7} roughness={0.3} />
       </mesh>
       <mesh position={[COIN_SLOT.x, COIN_SLOT.y, COIN_SLOT.z + 0.008]}>
-        <boxGeometry args={[0.016, 0.075, 0.006]} />
+        <boxGeometry args={[0.02, 0.104, 0.006]} />
         <meshStandardMaterial color="#17120a" roughness={0.9} />
       </mesh>
       <mesh ref={coin} visible={false} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.058, 0.058, 0.014, 24]} />
+        <cylinderGeometry args={[0.044, 0.044, 0.013, 24]} />
         <meshStandardMaterial
           color="#ffd257"
           metalness={0.85}
