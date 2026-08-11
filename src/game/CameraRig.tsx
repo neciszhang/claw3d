@@ -34,6 +34,7 @@ type CineMode = 'none' | 'coin' | 'carry'
 export function CameraRig() {
   const controls = useRef<OrbitControlsImpl>(null)
   const snap = useRef<{ active: boolean; from: number; to: number; start: number } | null>(null)
+  const viewAnim = useRef<{ active: boolean; from: THREE.Vector3; to: THREE.Vector3; start: number } | null>(null)
   const cine = useRef<{
     mode: CineMode
     saved: { pos: THREE.Vector3; target: THREE.Vector3 } | null
@@ -68,7 +69,7 @@ export function CameraRig() {
     // — Cinematic director —
     const store = useGameStore.getState()
     let want: CineMode = 'none'
-    if (!prefersReducedMotion()) {
+    if (!prefersReducedMotion() && store.settings.autoCamera) {
       if (store.status === 'COIN') want = 'coin'
       else if (
         store.status === 'GRABBING' &&
@@ -127,6 +128,30 @@ export function CameraRig() {
           c.enabled = true
           c.update()
         }
+      }
+      return
+    }
+
+    // — View preset request: front / side / top —
+    if (refs.viewRequest >= 0 && cine.current.mode === 'none' && !cine.current.returning) {
+      const req = refs.viewRequest
+      refs.viewRequest = -1
+      const target = c.target
+      const dist = cam.position.distanceTo(target)
+      if (req === 0) tmpPos.current.set(target.x, target.y + 0.6, target.z + dist)
+      else if (req === 1) tmpPos.current.set(target.x + dist, target.y + 0.6, target.z)
+      else tmpPos.current.set(target.x + 0.001, target.y + dist, target.z + 0.001)
+      viewAnim.current = { active: true, from: cam.position.clone(), to: tmpPos.current.clone(), start: performance.now() }
+    }
+    if (viewAnim.current?.active) {
+      const va = viewAnim.current
+      const k = Math.min(1, (performance.now() - va.start) / 450)
+      cam.position.lerpVectors(va.from, va.to, 1 - (1 - k) ** 3)
+      cam.lookAt(c.target)
+      c.update()
+      if (k >= 1) {
+        va.active = false
+        refs.snappedAzimuth = normalizeAngle(c.getAzimuthalAngle())
       }
       return
     }

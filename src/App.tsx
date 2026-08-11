@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import { ASSETS, RENDER } from './config/gameConfig'
 import { Scene } from './game/Scene'
-import { useGameStore } from './store/gameStore'
+import { clearInterrupted, markInterrupted, useGameStore } from './store/gameStore'
 import { detectWebGL } from './utils/capabilities'
 import { useKeyboard } from './hooks/useKeyboard'
 import { sound } from './audio/soundManager'
@@ -23,6 +23,9 @@ import {
 } from './ui/Modals'
 import { ConfirmClear, HistoryDrawer, SettingsPanel } from './ui/SettingsPanel'
 import { PerfPanel } from './ui/PerfPanel'
+import { SkipButton } from './ui/SkipButton'
+import { AlbumPanel } from './ui/AlbumPanel'
+import { PhotoBar } from './ui/PhotoBar'
 
 export default function App() {
   const status = useGameStore((s) => s.status)
@@ -44,6 +47,8 @@ export default function App() {
   }, [setUnsupported, setStatus])
 
   const language = useGameStore((s) => s.settings.language)
+  const photoMode = useGameStore((s) => s.photoMode)
+  const leftHanded = useGameStore((s) => s.settings.leftHanded)
   useEffect(() => {
     document.title = language === 'zh' ? '3D 娃娃机' : '3D Claw Machine'
     document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en'
@@ -57,18 +62,41 @@ export default function App() {
     }
   }, [status])
 
-  // Unlock audio on first interaction; stop music and clear input when tab is hidden
+  // Unlock audio on first interaction; auto-pause + mute when the tab goes to the background
   useEffect(() => {
     const unlock = () => sound.unlock()
     const onVisibility = () => {
-      if (document.hidden) sound.stopMusic()
-      else sound.syncMusic()
+      if (document.hidden) {
+        sound.stopMusic()
+        const st = useGameStore.getState()
+        if (st.status === 'READY' || st.status === 'MOVING' || st.status === 'CAMERA_SNAP') st.pause()
+      } else {
+        sound.syncMusic()
+      }
     }
     window.addEventListener('pointerdown', unlock, { once: true })
     document.addEventListener('visibilitychange', onVisibility)
     return () => {
       window.removeEventListener('pointerdown', unlock)
       document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
+
+  // Interrupted-round protection: flag the round on pagehide; refund settles on next load.
+  // A bfcache restore (pageshow with persisted=true) means the round is still alive → clear the flag.
+  useEffect(() => {
+    const onHide = () => {
+      const st = useGameStore.getState()
+      if (st.status === 'GRABBING' || st.status === 'COIN') markInterrupted()
+    }
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) clearInterrupted()
+    }
+    window.addEventListener('pagehide', onHide)
+    window.addEventListener('pageshow', onShow)
+    return () => {
+      window.removeEventListener('pagehide', onHide)
+      window.removeEventListener('pageshow', onShow)
     }
   }, [])
 
@@ -116,11 +144,13 @@ export default function App() {
         </Canvas>
       )}
 
-      {inGame && (
-        <div className="ui-layer">
+      {inGame && photoMode && <PhotoBar />}
+      {inGame && !photoMode && (
+        <div className={`ui-layer${leftHanded ? ' swap-hands' : ''}`}>
           <HUD />
           <Joystick />
           <StartButton />
+          <SkipButton />
           <PerfPanel />
         </div>
       )}
@@ -136,6 +166,7 @@ export default function App() {
       {overlay === 'history' && <HistoryDrawer />}
       {overlay === 'confirmRestart' && <ConfirmRestart />}
       {overlay === 'confirmClear' && <ConfirmClear />}
+      {overlay === 'album' && <AlbumPanel />}
     </div>
   )
 }

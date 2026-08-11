@@ -11,6 +11,7 @@ import { Machine } from './Machine'
 import { MinimapRenderer } from './MinimapRenderer'
 import { PerfMonitor, Stage } from './Stage'
 import { Toys, toyRegistry } from './Toys'
+import { AimAssist } from './AimAssist'
 
 /** Notify the state machine once all 3D assets are loaded (Suspense resolved) */
 function LoadedSignal() {
@@ -106,6 +107,7 @@ export function Scene() {
         <GrabController />
       </Physics>
 
+      <AimAssist />
       <LoadedSignal />
       <ResetHandler />
       <CameraRig />

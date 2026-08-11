@@ -3,9 +3,14 @@ import {
   COIN,
   DIFFICULTY,
   STORAGE_KEYS,
+  TIMING,
   TOY,
+  TOY_TYPES,
+  TOY_TYPE_MAP,
+  rollToyType,
   type Difficulty,
   type Quality,
+  type ToyTypeKey,
 } from '../config/gameConfig'
 import { storageGet, storageRemove, storageSet } from './persistence'
 import { clearMovementInput, refs, resetRoundRefs } from './refs'
@@ -27,12 +32,21 @@ export type GameStatus =
   | 'COMPLETED'
   | 'ERROR'
 
-export type Overlay = 'none' | 'settings' | 'help' | 'history' | 'confirmRestart' | 'confirmClear'
+export interface Progress {
+  stars: number
+  collection: Partial<Record<ToyTypeKey, number>>
+  achievements: string[]
+}
+
+export type SlipReason = 'eccentric' | 'fastMove' | 'weakGrip'
+
+export type Overlay = 'none' | 'settings' | 'help' | 'history' | 'confirmRestart' | 'confirmClear' | 'album'
 
 export interface ToyMeta {
   id: number
   status: 'inBox' | 'held' | 'out'
   spawn: [number, number]
+  type: ToyTypeKey
 }
 
 export interface Settings {
@@ -47,6 +61,16 @@ export interface Settings {
   language: 'en' | 'zh'
   /** Steady-grip mode: a grabbed toy never slips (assist/demo) */
   steadyGrip: boolean
+  /** Aim assist: projection ring under the claw with a catchable hint */
+  aimAssist: boolean
+  /** Auto cinematic camera (coin close-up / carry follow); off = fully manual */
+  autoCamera: boolean
+  /** Left-handed layout: joystick on the right, start button on the left */
+  leftHanded: boolean
+  /** Joystick re-centers to wherever the finger lands (mobile) */
+  joystickFollow: boolean
+  /** Slow the claw near a catchable toy for precise aiming */
+  precisionSlow: boolean
 }
 
 export interface RoundRecord {
@@ -73,6 +97,11 @@ const defaultSettings: Settings = {
   perfPanel: false,
   language: 'en',
   steadyGrip: false,
+  aimAssist: true,
+  autoCamera: true,
+  leftHanded: false,
+  joystickFollow: false,
+  precisionSlow: true,
 }
 
 const defaultStats: Stats = { attempts: 0, successes: 0, fastestTime: null, recent: [] }
@@ -80,8 +109,9 @@ const defaultStats: Stats = { attempts: 0, successes: 0, fastestTime: null, rece
 function buildToys(difficulty: Difficulty): ToyMeta[] {
   return DIFFICULTY[difficulty].layout.slice(0, TOY.count).map((spawn, i) => ({
     id: i,
-    status: 'inBox',
+    status: 'inBox' as const,
     spawn,
+    type: rollToyType().key,
   }))
 }
 
@@ -95,7 +125,12 @@ interface GameStore {
   coins: number
   dailyBonus: number
   coinHint: number
-  resultInfo: { result: 'success' | 'fail'; timeMs: number; bounced?: boolean; slipped?: boolean } | null
+  slipFlash: { reason: SlipReason; at: number } | null
+  progress: Progress
+  /** Recently unlocked achievement ids queued for the toast */
+  achievementFlash: string | null
+  photoMode: boolean
+  resultInfo: { result: 'success' | 'fail'; timeMs: number; bounced?: boolean; slipped?: boolean; slipReason?: SlipReason | null } | null
   overlay: Overlay
   loadError: string | null
   resetNonce: number
@@ -115,7 +150,7 @@ interface GameStore {
   setCameraDirection: (d: 0 | 1 | 2 | 3) => void
   startGrab: () => boolean
   insertCoin: () => boolean
-  finishRound: (result: 'success' | 'fail', timeMs: number, bounced?: boolean, slipped?: boolean) => void
+  finishRound: (result: 'success' | 'fail', timeMs: number, bounced?: boolean, slipped?: boolean, slipReason?: SlipReason | null, wonToyId?: number) => void
   setToyStatus: (id: number, status: ToyMeta['status']) => void
   playAgain: () => void
   closeResult: () => void
@@ -123,6 +158,13 @@ interface GameStore {
   finishReset: () => void
   clearDailyBonus: () => void
   askCoin: () => void
+  /** One machine shake per game: nudges all toys with random impulses */
+  shakeUsed: boolean
+  shakeMachine: () => void
+  flashSlip: (reason: SlipReason) => void
+  clearSlipFlash: () => void
+  clearAchievementFlash: () => void
+  setPhotoMode: (on: boolean) => void
   pause: () => void
   resume: () => void
   openOverlay: (o: Overlay) => void
@@ -139,17 +181,83 @@ function localDay(): string {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
 }
 const initialWallet = (() => {
-  const w = storageGet(STORAGE_KEYS.wallet, { coins: COIN.perGame, lastBonusDay: '' })
+  const w = storageGet(STORAGE_KEYS.wallet, {
+    coins: COIN.perGame,
+    lastBonusDay: '',
+    pendingRefund: false,
+  })
   const today = localDay()
   const bonus = w.lastBonusDay === today ? 0 : COIN.dailyBonus
+  // Settle the interrupted-round refund exactly once, at load time
+  const refund = w.pendingRefund ? 1 : 0
   // Bankruptcy relief: top up to 5 coins on entry (after the daily bonus) so the game never soft-locks
-  const coins = Math.max(w.coins + bonus, 5)
-  storageSet(STORAGE_KEYS.wallet, { coins, lastBonusDay: today })
+  const coins = Math.max(w.coins + bonus + refund, 5)
+  storageSet(STORAGE_KEYS.wallet, { coins, lastBonusDay: today, pendingRefund: false })
   return { coins, bonus }
 })()
+/**
+ * Interrupted-round protection. pagehide can fire repeatedly without the page being
+ * destroyed (bfcache), so never mutate the coin count here — only set an idempotent
+ * flag. The actual refund is settled exactly once on the next page load; if the page
+ * comes back alive from bfcache the flag is cleared because the round continues.
+ */
+export function markInterrupted(): void {
+  const w = storageGet(STORAGE_KEYS.wallet, { coins: 0, lastBonusDay: '', pendingRefund: false })
+  storageSet(STORAGE_KEYS.wallet, { ...w, pendingRefund: true })
+}
+
+export function clearInterrupted(): void {
+  const w = storageGet(STORAGE_KEYS.wallet, { coins: 0, lastBonusDay: '', pendingRefund: false })
+  if (w.pendingRefund) storageSet(STORAGE_KEYS.wallet, { ...w, pendingRefund: false })
+}
+
+const defaultProgress: Progress = { stars: 0, collection: {}, achievements: [] }
+
+interface AchievementCtx {
+  result: 'success' | 'fail'
+  timeMs: number
+  slipped: boolean
+  streak: number
+  attemptsTotal: number
+  successesTotal: number
+  collection: Partial<Record<ToyTypeKey, number>>
+  settings: Settings
+}
+
+/** Session-scoped success streak (not persisted) */
+let currentStreak = 0
+
+/** Late-bound toy body registry (set by Toys.tsx) to avoid a circular import */
+export const toyBodies = new Map<number, { wakeUp: () => void; applyImpulse: (v: { x: number; y: number; z: number }, wake: boolean) => void }>()
+
+export const ACHIEVEMENTS: { id: string; check: (c: AchievementCtx) => boolean }[] = [
+  { id: 'firstWin', check: (c) => c.result === 'success' && c.successesTotal >= 1 },
+  { id: 'oneShot', check: (c) => c.result === 'success' && c.attemptsTotal === 1 },
+  { id: 'streak3', check: (c) => c.streak >= 3 },
+  { id: 'luckyRoll', check: (c) => c.result === 'success' && c.slipped },
+  { id: 'fast10', check: (c) => c.result === 'success' && c.timeMs <= 10000 },
+  { id: 'hardWin', check: (c) => c.result === 'success' && c.settings.difficulty === 'hard' },
+  { id: 'noAssist', check: (c) => c.result === 'success' && !c.settings.aimAssist },
+  { id: 'noMinimap', check: (c) => c.result === 'success' && !c.settings.minimap },
+  {
+    id: 'collectAll',
+    check: (c) => TOY_TYPES.every((t) => (c.collection[t.key] ?? 0) > 0),
+  },
+]
+
+function persistProgress(p: Progress): void {
+  storageSet(STORAGE_KEYS.progress, p)
+}
+
 function persistCoins(coins: number): void {
   const w = storageGet(STORAGE_KEYS.wallet, { coins, lastBonusDay: localDay() })
-  storageSet(STORAGE_KEYS.wallet, { coins, lastBonusDay: w.lastBonusDay || localDay() })
+  // A live coin transaction means the round economy is being settled normally,
+  // so any stale pendingRefund flag is dropped on purpose
+  storageSet(STORAGE_KEYS.wallet, {
+    coins,
+    lastBonusDay: w.lastBonusDay || localDay(),
+    pendingRefund: false,
+  })
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -162,6 +270,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   coins: initialWallet.coins,
   dailyBonus: initialWallet.bonus,
   coinHint: 0,
+  shakeUsed: false,
+  slipFlash: null,
+  progress: storageGet(STORAGE_KEYS.progress, defaultProgress),
+  achievementFlash: null,
+  photoMode: false,
   resultInfo: null,
   overlay: 'none',
   loadError: null,
@@ -201,6 +314,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return false
     }
     refs.coinStart = performance.now()
+    // Consecutive plays get a shortened coin animation
+    refs.coinDuration = get().attempts > 0 ? TIMING.coinFastDuration : TIMING.coinDuration
+    refs.skipAnim = false
     persistCoins(coins - 1)
     set({ status: 'COIN', coins: coins - 1 })
     return true
@@ -221,8 +337,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return true
   },
 
-  finishRound: (result, timeMs, bounced, slipped) => {
-    const { stats, attempts, successes, coins } = get()
+  finishRound: (result, timeMs, bounced, slipped, slipReason, wonToyId) => {
+    const { stats, attempts, successes, coins, toys, progress, settings } = get()
     const record: RoundRecord = { result, timeMs, at: Date.now() }
     const nextStats: Stats = {
       attempts: stats.attempts + 1,
@@ -239,13 +355,44 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Reward coins on a win to encourage another round
     const nextCoins = result === 'success' ? coins + COIN.winReward : coins
     if (nextCoins !== coins) persistCoins(nextCoins)
+    // Collection & stars: rarity-based star reward, duplicates keep counting
+    let nextProgress = progress
+    let unlocked: string | null = null
+    if (result === 'success' && wonToyId != null) {
+      const toyType = toys.find((t) => t.id === wonToyId)?.type ?? 'shiba'
+      const def = TOY_TYPE_MAP[toyType]
+      const collection = { ...progress.collection, [toyType]: (progress.collection[toyType] ?? 0) + 1 }
+      nextProgress = { ...progress, stars: progress.stars + def.stars, collection }
+    }
+    // Achievements
+    const ctx = {
+      result,
+      timeMs,
+      slipped: !!slipped,
+      streak: result === 'success' ? currentStreak + 1 : 0,
+      attemptsTotal: nextStats.attempts,
+      successesTotal: nextStats.successes,
+      collection: nextProgress.collection,
+      settings,
+    }
+    currentStreak = ctx.streak
+    for (const a of ACHIEVEMENTS) {
+      if (nextProgress.achievements.includes(a.id)) continue
+      if (a.check(ctx)) {
+        nextProgress = { ...nextProgress, achievements: [...nextProgress.achievements, a.id] }
+        unlocked = a.id
+      }
+    }
+    if (nextProgress !== progress) persistProgress(nextProgress)
     set({
       status: 'RESULT',
-      resultInfo: { result, timeMs, bounced, slipped },
+      resultInfo: { result, timeMs, bounced, slipped, slipReason },
       attempts: attempts + 1,
       successes: successes + (result === 'success' ? 1 : 0),
       coins: nextCoins,
       stats: nextStats,
+      progress: nextProgress,
+      ...(unlocked ? { achievementFlash: unlocked } : {}),
     })
   },
 
@@ -281,11 +428,36 @@ export const useGameStore = create<GameStore>((set, get) => ({
       attempts: 0,
       successes: 0,
       coins: nextCoins,
+      shakeUsed: false,
       resetNonce: st.resetNonce + 1,
     }))
   },
 
   clearDailyBonus: () => set({ dailyBonus: 0 }),
+
+  shakeMachine: () => {
+    const { shakeUsed, status, toys } = get()
+    if (shakeUsed) return
+    if (status !== 'READY' && status !== 'MOVING' && status !== 'UNPAID') return
+    refs.shakeAt = performance.now()
+    for (const toy of toys) {
+      if (toy.status !== 'inBox') continue
+      const body = toyBodies.get(toy.id)
+      if (!body) continue
+      body.wakeUp()
+      body.applyImpulse(
+        { x: (Math.random() - 0.5) * 0.02, y: Math.random() * 0.025, z: (Math.random() - 0.5) * 0.02 },
+        true,
+      )
+    }
+    set({ shakeUsed: true })
+  },
+
+  /** Instant on-screen callout at the moment the toy slips */
+  flashSlip: (reason) => set({ slipFlash: { reason, at: Date.now() } }),
+  clearSlipFlash: () => set({ slipFlash: null }),
+  clearAchievementFlash: () => set({ achievementFlash: null }),
+  setPhotoMode: (on) => set({ photoMode: on, overlay: 'none' }),
 
   /** Joystick touched without a coin: remind the player to insert one (throttled to 1.5s) */
   askCoin: () => {

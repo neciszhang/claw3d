@@ -1,137 +1,113 @@
 # Claw Machine 3D
 
-A 3D claw machine web game built with React + Three.js + the Rapier physics engine. Drive the overhead claw via a virtual joystick or keyboard, and grab as many toys as possible into the exit chute within a limited number of coins — recreating the feel and tension of a real claw machine.
+A fully client-side 3D claw machine game built with **React 19 + Three.js + Rapier physics**. Aim with the joystick and minimap, drop the claw, and pray your grip holds — the toy can slip mid-carry just like a real arcade machine. Coins, toy collection, achievements, and progress all persist locally; no server required.
 
 ## Live Preview
 
-> Live preview link: https://neciszhang.github.io/claw3d/
+> https://neciszhang.github.io/claw3d/
 
 ## Screenshot
 
 ![Claw Machine 3D Gameplay](screenshot/20260807172320.jpg)
 
+## Gameplay
+
+- **Insert a coin** (1 🪙 per grab), move the claw with the joystick / WASD / arrow keys, press **START**
+- The three-prong claw physically closes around toys — a toy touched by all three prongs is caught
+- Caught ≠ won: the toy **swings while carried and can slip**, driven by your aim accuracy, movement speed, toy weight, and difficulty; slipping near the chute can still luckily roll in
+- Two consecutive slips lock the grip: the next catch is guaranteed (pity system)
+- Wins pay back 1 🪙 and rarity-based ⭐ stars; check the album for collection and achievements
+
 ## Features
 
-- Realistic physics simulation: powered by Rapier 3D rigid-body physics; toy collision, stacking, and sliding are computed in real time
-- Three-prong grab mechanic: move → descend → close → ascend → move to exit → release, fully reproducing the claw machine operation flow
-- Multiple difficulty levels: Easy / Normal / Hard, affecting claw speed, sensor radius, and toy layout density
-- Coin-based gameplay: 15 coins per session; the round ends when coins run out, tracking success rate and fastest completion time
-- Dual-platform controls: virtual joystick on mobile + keyboard on desktop (WASD / arrow keys to move, Space / Enter to grab)
-- Real-time minimap: top-down view showing claw position and toy distribution for easier aiming
-- Bilingual (zh / en): built-in i18n with Chinese / English switching
-- Adaptive quality: high / low quality presets, auto-adjusting device pixel ratio and shadows
-- Sound effects & haptics: coin, grab, success / failure sounds with mobile vibration feedback
-- Onboarding tutorial: first-time guided walkthrough, skippable
-- Data persistence: settings and stats stored locally, surviving page refreshes
-- WebGL capability detection: graceful fallback when unsupported, with context-loss recovery
+### Core experience
+- Real rigid-body simulation (Rapier): toy collision, stacking, swinging, slipping
+- Aim assist: floor projection ring that turns gold over a catchable toy (toggleable)
+- Slip reasons surfaced to the player: off-center grab / moved too fast / weak grip
+- Catch / slip / drop-in feedback: claw jolt & bite pause, camera shake & callouts, coin fly-in
+- Fast failure recovery: accelerated recall on a miss, skip button, shortened coin animation on replays
+
+### Content & progression (all localStorage, no backend)
+- **5 toy variants across 3 rarity tiers** (common / rare / hidden) with distinct color, size, weight, and slip factor
+- **Collection album** with owned counts and hidden-toy teasers
+- **9 achievements** (first catch, one-shot, 3-streak, lucky roll, no-minimap win…)
+- Persistent coin wallet with **daily login bonus**, win rewards, and bankruptcy relief
+- Local stats: attempts, wins, fastest time, recent rounds
+
+### Controls & camera
+- Virtual joystick (fixed or **follow-finger** mode), keyboard, left-handed layout
+- Four-way camera snap + one-tap **front / side / top** presets
+- Auto cinematic camera (coin close-up, carry follow) — can be disabled
+- Precision slowdown near catchable toys (toggleable)
+- Machine **shake** (once per game) to loosen stuck toys
+
+### Extras
+- **Photo mode**: hide the UI, frame your shot, export PNG
+- **Share card**: canvas-rendered result card download
+- Real-time top-down minimap, onboarding tutorial, zh/en i18n
+- Auto-pause in background tabs; coin refund if the page closes mid-grab
+
+### Performance
+- Toys rendered via `instancedMesh` (per-instance color) — 4 draw calls for all toys
+- Expensive shaders (aurora dome, raymarched nebula floor) render into small offscreen targets at reduced refresh rates
+- Minimap second pass throttled to every 3rd frame and blitted from a cached texture
+- Shadow map freezing when the scene is static, 4 lights total, quality tiers (High / Smooth)
+- Vendor chunk splitting (three / rapier / react) for long-term caching
 
 ## Tech Stack
 
 | Category | Technology | Version |
 | --- | --- | --- |
-| UI Framework | React + React DOM | ^19.2 |
-| 3D Rendering | Three.js | ^0.185 |
-| React 3D Bindings | @react-three/fiber | ^9.7 |
-| 3D Physics Engine | @react-three/rapier (Rapier) | ^2.2 |
-| 3D Helpers | @react-three/drei | ^10.7 |
-| State Management | Zustand | ^5.0 |
-| Build Tool | Vite | ^5.4 |
-| Type System | TypeScript | ^5.6 |
+| UI framework | React + React DOM | ^19.2 |
+| 3D rendering | Three.js | ^0.185 |
+| React 3D bindings | @react-three/fiber | ^9.7 |
+| Physics | @react-three/rapier (Rapier) | ^2.2 |
+| 3D helpers | @react-three/drei | ^10.7 |
+| State | Zustand | ^5.0 |
+| Build | Vite | ^5.4 |
+| Types | TypeScript | ^5.6 |
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js >= 18
-- npm >= 9 (or use pnpm / yarn etc.)
-
-### Install Dependencies
-
 ```bash
+# Node.js >= 18
 npm install
+npm run dev        # dev server (LAN access enabled)
+npm run typecheck  # tsc -b
+npm run build      # production build to dist/
+npm run preview    # preview the dist build
 ```
 
-### Local Development
+## Deployment
 
-```bash
-npm run dev
-```
-
-Starts the Vite dev server, available at `http://localhost:5173` by default (`host: true` is enabled for LAN access).
-
-### Production Build
-
-```bash
-npm run build
-```
-
-Runs `tsc -b` for type checking and compilation, then `vite build` to bundle. Output goes to `dist/`.
-
-### Preview Build
-
-```bash
-npm run preview
-```
-
-Starts a local static server to preview the production build in `dist/`.
+Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds and publishes to GitHub Pages. `vite.config.ts` sets `base: '/claw3d/'` for production; adjust `repoName` if you fork under a different repository name.
 
 ## Project Structure
 
 ```
-claw3d/
-├── public/
-│   └── models/              # 3D model assets (.glb)
-│       ├── boxoutnew.glb            # Cabinet (with WebP textures)
-│       ├── boxoutnewWithOutWebp.glb # Cabinet (without WebP textures, fallback)
-│       ├── clawoutnew.glb           # Claw assembly
-│       ├── dogout.glb              # Toys (with WebP textures)
-│       └── dogoutWithOutWebp.glb    # Toys (without WebP textures, fallback)
-├── src/
-│   ├── audio/
-│   │   └── soundManager.ts         # Sound effects and haptics management
-│   ├── config/
-│   │   └── gameConfig.ts           # Game constants (physics, claw, difficulty, rendering, etc.)
-│   ├── game/                        # 3D scene and game logic components
-│   │   ├── Scene.tsx                # 3D scene entry (lights, physics world, component orchestration)
-│   │   ├── Stage.tsx                # Stage and cabinet rendering
-│   │   ├── Machine.tsx             # Claw machine cabinet body
-│   │   ├── Claw.tsx                # Claw model and animation
-│   │   ├── GrabController.tsx      # Grab flow controller (descend / close / ascend / exit / release)
-│   │   ├── Toys.tsx                # Toy spawning and physics rigid bodies
-│   │   ├── CameraRig.tsx           # Camera orbit controls
-│   │   └── MinimapRenderer.tsx     # Top-down minimap rendering
-│   ├── hooks/
-│   │   └── useKeyboard.ts          # Keyboard input hook
-│   ├── i18n/
-│   │   └── index.ts               # Chinese / English copy
-│   ├── store/
-│   │   ├── gameStore.ts           # Zustand global state (state machine, settings, stats)
-│   │   ├── persistence.ts         # localStorage persistence utilities
-│   │   └── refs.ts               # Mutable refs outside React render cycle (input, phase timing)
-│   ├── ui/                         # 2D UI overlay components
-│   │   ├── HUD.tsx                # Top info bar (coins, toy count, timer)
-│   │   ├── Joystick.tsx           # Mobile virtual joystick
-│   │   ├── StartButton.tsx        # Grab button
-│   │   ├── LoadingScreen.tsx      # Loading screen
-│   │   ├── Tutorial.tsx           # Onboarding tutorial
-│   │   ├── Modals.tsx             # Result / pause / complete / error modals
-│   │   ├── SettingsPanel.tsx      # Settings panel (sound / quality / difficulty / language / history)
-│   │   └── PerfPanel.tsx          # Performance monitor panel
-│   ├── utils/
-│   │   └── capabilities.ts        # WebGL capability detection
-│   ├── App.tsx                    # Root app component (Canvas + UI orchestration)
-│   ├── main.tsx                   # React entry
-│   └── styles.css                 # Global styles
-├── index.html
-├── vite.config.ts
-├── tsconfig.json
-└── package.json
+src/
+├── config/gameConfig.ts   # All tunables: physics, claw, grip/slip, toy types, timing, storage keys
+├── store/
+│   ├── gameStore.ts       # Zustand store: game state machine, wallet, progress, achievements
+│   ├── refs.ts            # Per-frame hot data (claw position, phases) bypassing React state
+│   └── persistence.ts     # localStorage helpers
+├── game/                  # 3D scene: Machine, Claw, Toys (instanced), GrabController,
+│                          # CameraRig, MinimapRenderer, Stage (shaders), AimAssist
+├── ui/                    # HUD, joystick, modals, settings, album, photo bar
+├── audio/soundManager.ts  # WebAudio synth SFX + music loop
+├── i18n/                  # zh / en dictionaries
+└── utils/                 # capability detection, share card renderer
 ```
 
-## Browser Support
+## Tuning
 
-Requires a modern browser with WebGL 2 support (latest Chrome / Edge / Firefox / Safari). On mobile, iOS 15+ / Android 10+ is recommended.
+Difficulty and feel are data-driven in `src/config/gameConfig.ts`:
+
+- `GRIP` — slip probability model (base, eccentricity weight, swing hazard, pity threshold)
+- `TOY_TYPES` — rarity table: spawn weight, scale, density, slip factor, star reward
+- `TIMING` — every phase duration of the grab cycle
+- `DIFFICULTY` — claw speed, sensor radius, toy layout per difficulty
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](./LICENSE).
+MIT

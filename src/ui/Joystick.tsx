@@ -9,6 +9,7 @@ const KNOB = 52
 /** Bottom-left virtual joystick: continuous angle + magnitude (FR-201/202/204/205) */
 export function Joystick() {
   const baseRef = useRef<HTMLDivElement>(null)
+  const zoneRef = useRef<HTMLDivElement>(null)
   const knobRef = useRef<HTMLDivElement>(null)
   const activePointer = useRef<number | null>(null)
   const t = useT()
@@ -42,6 +43,7 @@ export function Joystick() {
     }
 
     const reset = () => {
+      if (useGameStore.getState().settings.joystickFollow) resetBasePos()
       activePointer.current = null
       refs.joystick.x = 0
       refs.joystick.y = 0
@@ -55,6 +57,27 @@ export function Joystick() {
       base.setPointerCapture(e.pointerId)
       setVector(e.clientX, e.clientY)
     }
+    // Follow mode: the stick re-centers to wherever the finger lands inside the zone
+    const zone = zoneRef.current
+    const onZoneDown = (e: PointerEvent) => {
+      if (!useGameStore.getState().settings.joystickFollow) return
+      if (activePointer.current != null) return
+      const half = SIZE / 2
+      base.style.left = `${e.clientX - half}px`
+      base.style.top = `${e.clientY - half}px`
+      base.style.right = 'auto'
+      base.style.bottom = 'auto'
+      activePointer.current = e.pointerId
+      base.setPointerCapture(e.pointerId)
+      setVector(e.clientX, e.clientY)
+    }
+    const resetBasePos = () => {
+      base.style.left = ''
+      base.style.top = ''
+      base.style.right = ''
+      base.style.bottom = ''
+    }
+    zone?.addEventListener('pointerdown', onZoneDown)
     const onMove = (e: PointerEvent) => {
       if (e.pointerId !== activePointer.current) return
       setVector(e.clientX, e.clientY)
@@ -81,25 +104,29 @@ export function Joystick() {
       base.removeEventListener('pointercancel', onUp)
       window.removeEventListener('blur', onBlur)
       document.removeEventListener('visibilitychange', onVisibility)
+      zone?.removeEventListener('pointerdown', onZoneDown)
       reset()
     }
   }, [])
 
   return (
-    <div
-      ref={baseRef}
-      className="joystick"
-      role="application"
-      aria-label={t.hud.joystickAria}
-      style={{ width: SIZE, height: SIZE }}
-    >
+    <>
+      <div ref={zoneRef} className="joystick-zone" aria-hidden />
+      <div
+        ref={baseRef}
+        className="joystick"
+        role="application"
+        aria-label={t.hud.joystickAria}
+        style={{ width: SIZE, height: SIZE }}
+      >
       <div className="joystick-cross" aria-hidden>
         <span>▲</span>
         <span>▶</span>
         <span>▼</span>
         <span>◀</span>
       </div>
-      <div ref={knobRef} className="joystick-knob" style={{ width: KNOB, height: KNOB }} />
-    </div>
+        <div ref={knobRef} className="joystick-knob" style={{ width: KNOB, height: KNOB }} />
+      </div>
+    </>
   )
 }

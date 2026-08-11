@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { CLAW, DIFFICULTY, GRIP, PHYSICS, TIMING } from '../config/gameConfig'
+import { CLAW, DIFFICULTY, GRIP, PHYSICS, TIMING, TOY_TYPE_MAP } from '../config/gameConfig'
 import { useGameStore } from '../store/gameStore'
 import { refs, type GrabPhase } from '../store/refs'
 import { toyRegistry } from './Toys'
@@ -20,9 +20,12 @@ interface Anchor {
   off: { x: number; y: number; z: number }
   settleResult: 'success' | 'fail'
   bounced: boolean
+  caughtId: number
   /** Carry progress (0..1) at which this round is scheduled to slip; -1 = firm grip, no slip */
   slipAt: number
   slipped: boolean
+  slipReason: 'eccentric' | 'fastMove' | 'weakGrip' | null
+  preGrab: { id: number; ecc: number }
   swing: { x: number; z: number; vx: number; vz: number }
   prev: { x: number; z: number }
   vel: { x: number; z: number }
@@ -55,8 +58,11 @@ export function GrabController() {
     off: { x: 0, y: 0, z: 0 },
     settleResult: 'fail',
     bounced: false,
+    caughtId: -1,
     slipAt: -1,
     slipped: false,
+    slipReason: null,
+    preGrab: { id: -1, ecc: 1 },
     swing: { x: 0, z: 0, vx: 0, vz: 0 },
     prev: { x: 0, z: 0 },
     vel: { x: 0, z: 0 },
@@ -70,7 +76,7 @@ export function GrabController() {
 
     // — Coin animation: unlock controls when done —
     if (status === 'COIN') {
-      if (now - refs.coinStart >= TIMING.coinDuration) store.setStatus('READY')
+      if (now - refs.coinStart >= refs.coinDuration) store.setStatus('READY')
       return
     }
 
@@ -94,9 +100,24 @@ export function GrabController() {
         refs.moveVec.x = wx
         refs.moveVec.z = wz
         const speedFactor = DIFFICULTY[store.settings.difficulty].speedFactor
+        // Precision mode: slow down while hovering over a catchable toy
+        let precision = 1
+        if (store.settings.precisionSlow) {
+          for (const toy of store.toys) {
+            if (toy.status !== 'inBox') continue
+            const b = toyRegistry.get(toy.id)
+            if (!b) continue
+            const p = b.translation()
+            if (Math.hypot(p.x - refs.clawPos.x, p.z - refs.clawPos.z) < 0.14) {
+              precision = 0.5
+              break
+            }
+          }
+        }
         const speed =
           CLAW.baseMoveSpeed *
           speedFactor *
+          precision *
           THREE.MathUtils.lerp(CLAW.minSpeedFactor, 1, mag)
         refs.clawPos.x = THREE.MathUtils.clamp(
           refs.clawPos.x + wx * speed * delta,
@@ -120,7 +141,12 @@ export function GrabController() {
     if (status !== 'GRABBING') return
 
     // — Timeout protection (FR-408) —
-    const phaseDur = PHASE_DURATION[refs.grabPhase]
+    let phaseDur = PHASE_DURATION[refs.grabPhase]
+    if (refs.grabPhase === 'ascend' && refs.candidateToyId < 0) {
+      phaseDur = TIMING.failAscendDuration // accelerated recall when nothing was caught
+    } else if (refs.grabPhase === 'return' && grabAnchor.current.settleResult === 'fail') {
+      phaseDur = TIMING.failReturnDuration
+    }
     const elapsed = now - refs.phaseStart
     if (elapsed > phaseDur + TIMING.phaseTimeoutExtra) {
       console.error('[claw] Grab phase timeout, force reset', refs.grabPhase)
@@ -137,6 +163,23 @@ export function GrabController() {
       case 'descend': {
         refs.clawPos.y = THREE.MathUtils.lerp(CLAW.restY, CLAW.bottomY, easeInOut(t))
         if (t >= 1) {
+          // Snapshot aim eccentricity before the prongs squeeze the toy toward the center
+          const a = grabAnchor.current
+          a.preGrab.id = -1
+          a.preGrab.ecc = 1
+          let best = Infinity
+          for (const toy of store.toys) {
+            if (toy.status !== 'inBox') continue
+            const b = toyRegistry.get(toy.id)
+            if (!b) continue
+            const tp = b.translation()
+            const d = Math.hypot(tp.x - refs.clawPos.x, tp.z - refs.clawPos.z)
+            if (d < best) {
+              best = d
+              a.preGrab.id = toy.id
+            }
+          }
+          if (a.preGrab.id >= 0) a.preGrab.ecc = Math.min(1, best / 0.18)
           setPhase('close')
           sound.play('close')
         }
@@ -173,14 +216,30 @@ export function GrabController() {
               a.prev.z = refs.clawPos.z
               a.vel.x = a.vel.z = 0
               a.slipped = false
-              // Grip roll: fixed random slip chance (independent of aim, like real arcades); grip locks after pityAfter consecutive slips
+              a.slipReason = null
+              // Grip roll: aim accuracy and difficulty drive the slip chance; pity/steady-grip disable it
+              const ecc = a.preGrab.id === candidate ? a.preGrab.ecc : 1
+              const diff = GRIP.difficultyFactor[store.settings.difficulty]
+              const typeFactor =
+                TOY_TYPE_MAP[store.toys.find((toy) => toy.id === candidate)?.type ?? 'shiba']
+                  .slipFactor
               const slipChance =
-                store.settings.steadyGrip || refs.slipStreak >= GRIP.pityAfter ? 0 : GRIP.slipChance
+                store.settings.steadyGrip || refs.slipStreak >= GRIP.pityAfter
+                  ? 0
+                  : Math.min(0.85, (GRIP.base + GRIP.eccentric * ecc) * diff * typeFactor)
               // Slip window 0.15~0.75, biased toward the ascent and early carry (claw not over the chute yet, so a slip always falls back into the pit)
-              a.slipAt =
-                Math.random() < slipChance ? 0.15 + 0.6 * Math.pow(Math.random(), 1.4) : -1
+              if (Math.random() < slipChance) {
+                a.slipAt = 0.15 + 0.6 * Math.pow(Math.random(), 1.4)
+                a.slipReason = ecc > 0.45 ? 'eccentric' : 'weakGrip'
+              } else {
+                a.slipAt = -1
+              }
               body.setBodyType(2, true) // KinematicPositionBased
               useGameStore.getState().setToyStatus(candidate, 'held')
+              // Catch feedback: claw jolt + a brief hold before ascending
+              refs.clawShakeAt = performance.now()
+              sound.vibrate(30)
+              refs.phaseStart = performance.now() + 200
             } else {
               // Toy reference lost: treat this round as a failure
               console.error('[claw] Toy rigid body reference lost', candidate)
@@ -203,8 +262,11 @@ export function GrabController() {
           a.off.z = THREE.MathUtils.lerp(a.off0.z, 0, k)
           a.off.y = THREE.MathUtils.lerp(a.off0.y, 0.02, k)
           updateSwing(a, delta)
-          if (a.slipAt >= 0 && t * 0.35 >= a.slipAt) slipToy(a)
-          else followToy(a)
+          swingHazard(a, delta, store)
+          if (!a.slipped) {
+            if (a.slipAt >= 0 && t * 0.35 >= a.slipAt) slipToy(a, a.slipReason ?? 'weakGrip')
+            else followToy(a)
+          }
         }
         if (t >= 1) {
           if (refs.candidateToyId >= 0) {
@@ -229,8 +291,11 @@ export function GrabController() {
         const a = grabAnchor.current
         if (!a.slipped) {
           updateSwing(a, delta)
-          if (a.slipAt >= 0 && 0.35 + t * 0.65 >= a.slipAt) slipToy(a)
-          else followToy(a)
+          swingHazard(a, delta, store)
+          if (!a.slipped) {
+            if (a.slipAt >= 0 && 0.35 + t * 0.65 >= a.slipAt) slipToy(a, a.slipReason ?? 'weakGrip')
+            else followToy(a)
+          }
         }
         if (t >= 1) {
           if (a.slipped) {
@@ -273,6 +338,7 @@ export function GrabController() {
         const settleDone = grabAnchor.current.slipped ? elapsed >= 1200 : t >= 1
         if (inChute || settleDone) {
           grabAnchor.current.settleResult = inChute ? 'success' : 'fail'
+          grabAnchor.current.caughtId = inChute ? id : -1
           grabAnchor.current.bounced = !inChute && !grabAnchor.current.slipped
           useGameStore.getState().setToyStatus(id, inChute ? 'out' : 'inBox')
           if (inChute) {
@@ -288,16 +354,20 @@ export function GrabController() {
         break
       }
       case 'return': {
-        refs.clawPos.x = THREE.MathUtils.lerp(grabAnchor.current.x, CLAW.homeX, easeInOut(t))
-        refs.clawPos.z = THREE.MathUtils.lerp(grabAnchor.current.z, CLAW.homeZ, easeInOut(t))
-        if (t >= 1) {
+        const tr = refs.skipAnim ? 1 : t
+        refs.clawPos.x = THREE.MathUtils.lerp(grabAnchor.current.x, CLAW.homeX, easeInOut(tr))
+        refs.clawPos.z = THREE.MathUtils.lerp(grabAnchor.current.z, CLAW.homeZ, easeInOut(tr))
+        if (tr >= 1) {
           setPhase('idle')
           const result = grabAnchor.current.settleResult
           store.finishRound(
             result,
             now - refs.roundStartedAt,
             grabAnchor.current.bounced,
-            result !== 'success' && grabAnchor.current.slipped,
+            // Keep the slipped flag on success too: the lucky-roll achievement needs it
+            grabAnchor.current.slipped,
+            grabAnchor.current.slipReason,
+            grabAnchor.current.caughtId >= 0 ? grabAnchor.current.caughtId : undefined,
           )
           if (result === 'success') {
             refs.slipStreak = 0
@@ -348,9 +418,21 @@ function updateSwing(a: Anchor, delta: number) {
   s.z = THREE.MathUtils.clamp(s.z + s.vz * dt, -0.09, 0.09)
 }
 
+/** Fast movement builds swing; excessive swing adds a per-second slip hazard */
+function swingHazard(a: Anchor, delta: number, store: ReturnType<typeof useGameStore.getState>) {
+  if (a.slipped || store.settings.steadyGrip || refs.slipStreak >= GRIP.pityAfter) return
+  const mag = Math.hypot(a.swing.x, a.swing.z)
+  const over = mag - GRIP.swingThreshold
+  if (over <= 0) return
+  const p = GRIP.swingHazard * over * GRIP.difficultyFactor[store.settings.difficulty] * Math.min(delta, 0.05)
+  if (Math.random() < p) slipToy(a, 'fastMove')
+}
+
 /** Mid-carry slip: switch back to a dynamic body and fall with the swing momentum */
-function slipToy(a: Anchor) {
+function slipToy(a: Anchor, reason: 'eccentric' | 'fastMove' | 'weakGrip') {
   a.slipped = true
+  a.slipReason = reason
+  useGameStore.getState().flashSlip(reason)
   refs.slipStreak += 1
   refs.shakeAt = performance.now()
   sound.play('slip')

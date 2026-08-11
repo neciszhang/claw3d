@@ -47,9 +47,13 @@ export const COIN = {
   winReward: 1, // coins returned per win (must stay below the per-round cost to avoid inflation)
 }
 
-/** Grip & slip: mimics real arcade machines — the toy may slip randomly while rising/carrying, independent of aim */
+/** Grip & slip: player actions influence the outcome (aim accuracy, movement speed, difficulty) */
 export const GRIP = {
-  slipChance: 0.45, // fixed probability of slipping after each successful grab
+  base: 0.1, // weak-grip probability floor even with a perfect grab
+  eccentric: 0.5, // extra slip probability scaled by aim eccentricity (0..1)
+  swingThreshold: 0.05, // swing amplitude above which fast movement adds slip hazard
+  swingHazard: 4.0, // hazard rate per second per unit of swing above the threshold
+  difficultyFactor: { easy: 0.7, normal: 1.0, hard: 1.35 } as Record<Difficulty, number>,
   pityAfter: 2, // after N consecutive slips the grip locks and the next catch holds (payout cycle)
 }
 
@@ -62,6 +66,9 @@ export const TIMING = {
   releaseDuration: 900,
   settleDuration: 4000,
   returnDuration: 1700,
+  failAscendDuration: 900, // accelerated recall when nothing was caught
+  failReturnDuration: 900, // faster home return after a failed round
+  coinFastDuration: 650, // shortened coin animation for consecutive plays
   cameraSnapDuration: 250,
   phaseTimeoutExtra: 8000,
 }
@@ -81,6 +88,47 @@ export const RENDER = {
 export const TOY = {
   radius: 0.175,
   count: 10,
+}
+
+export type Rarity = 'common' | 'rare' | 'hidden'
+export type ToyTypeKey = 'shiba' | 'snow' | 'sakura' | 'golden' | 'cosmic'
+
+export interface ToyTypeDef {
+  key: ToyTypeKey
+  rarity: Rarity
+  /** Instance tint multiplied over the base texture */
+  tint: string
+  scale: number
+  density: number
+  /** Multiplier applied to the slip chance (heavier / slipperier toys) */
+  slipFactor: number
+  /** Stars awarded per catch */
+  stars: number
+  /** Spawn weight */
+  weight: number
+}
+
+export const TOY_TYPES: ToyTypeDef[] = [
+  { key: 'shiba', rarity: 'common', tint: '#ffffff', scale: 1.0, density: 1.0, slipFactor: 1.0, stars: 1, weight: 46 },
+  { key: 'snow', rarity: 'common', tint: '#d9e8ff', scale: 0.94, density: 0.9, slipFactor: 0.95, stars: 1, weight: 22 },
+  { key: 'sakura', rarity: 'rare', tint: '#ffb3d2', scale: 1.0, density: 1.0, slipFactor: 1.15, stars: 3, weight: 15 },
+  { key: 'golden', rarity: 'rare', tint: '#ffd257', scale: 1.08, density: 1.35, slipFactor: 1.3, stars: 4, weight: 11 },
+  { key: 'cosmic', rarity: 'hidden', tint: '#b48cff', scale: 0.9, density: 0.85, slipFactor: 1.45, stars: 8, weight: 6 },
+]
+
+export const TOY_TYPE_MAP: Record<ToyTypeKey, ToyTypeDef> = Object.fromEntries(
+  TOY_TYPES.map((t) => [t.key, t]),
+) as Record<ToyTypeKey, ToyTypeDef>
+
+/** Weighted random toy type */
+export function rollToyType(rand: () => number = Math.random): ToyTypeDef {
+  const total = TOY_TYPES.reduce((s, t) => s + t.weight, 0)
+  let r = rand() * total
+  for (const t of TOY_TYPES) {
+    r -= t.weight
+    if (r <= 0) return t
+  }
+  return TOY_TYPES[0]
 }
 
 export interface DifficultyPreset {
@@ -114,4 +162,5 @@ export const STORAGE_KEYS = {
   stats: 'claw3d.stats.v1',
   tutorial: 'claw3d.tutorialDone.v1',
   wallet: 'claw3d.wallet.v1',
+  progress: 'claw3d.progress.v1',
 }

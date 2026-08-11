@@ -68,8 +68,23 @@ export function SettingsPanel() {
         <Toggle label={S.vibration} value={settings.vibration} onChange={(v) => updateSettings({ vibration: v })} onText={S.on} offText={S.off} />
         <Toggle label={S.minimap} value={settings.minimap} onChange={(v) => updateSettings({ minimap: v })} onText={S.on} offText={S.off} />
         <Toggle label={S.steadyGrip} value={settings.steadyGrip} onChange={(v) => updateSettings({ steadyGrip: v })} onText={S.on} offText={S.off} />
+        <Toggle label={S.aimAssist} value={settings.aimAssist} onChange={(v) => updateSettings({ aimAssist: v })} onText={S.on} offText={S.off} />
+        <Toggle label={S.autoCamera} value={settings.autoCamera} onChange={(v) => updateSettings({ autoCamera: v })} onText={S.on} offText={S.off} />
+        <Toggle label={S.leftHanded} value={settings.leftHanded} onChange={(v) => updateSettings({ leftHanded: v })} onText={S.on} offText={S.off} />
+        <Toggle label={S.joystickFollow} value={settings.joystickFollow} onChange={(v) => updateSettings({ joystickFollow: v })} onText={S.on} offText={S.off} />
+        <Toggle label={S.precisionSlow} value={settings.precisionSlow} onChange={(v) => updateSettings({ precisionSlow: v })} onText={S.on} offText={S.off} />
         <Toggle label={S.debug} value={settings.debug} onChange={(v) => updateSettings({ debug: v })} onText={S.on} offText={S.off} />
         <Toggle label={S.perf} value={settings.perfPanel} onChange={(v) => updateSettings({ perfPanel: v })} onText={S.on} offText={S.off} />
+        <button
+          className="btn"
+          style={{ width: '100%', marginBottom: 8 }}
+          onClick={() => {
+            sound.play('click')
+            useGameStore.getState().setPhotoMode(true)
+          }}
+        >
+          📸 {t.photo.enter}
+        </button>
         <label className="setting-row">
           <span>{S.quality}</span>
           <div className="seg" role="radiogroup" aria-label={S.quality}>

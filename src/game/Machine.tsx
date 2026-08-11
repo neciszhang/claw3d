@@ -3,7 +3,7 @@ import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import * as THREE from 'three'
-import { ASSETS, PHYSICS, TIMING } from '../config/gameConfig'
+import { ASSETS, PHYSICS } from '../config/gameConfig'
 import { refs } from '../store/refs'
 import { useGameStore } from '../store/gameStore'
 import { supportsWebP } from '../utils/capabilities'
@@ -58,7 +58,7 @@ export function Machine() {
     if (coin.current) {
       if (useGameStore.getState().status === 'COIN') {
         const t = THREE.MathUtils.clamp(
-          (performance.now() - refs.coinStart) / TIMING.coinDuration,
+          (performance.now() - refs.coinStart) / refs.coinDuration,
           0,
           1,
         )

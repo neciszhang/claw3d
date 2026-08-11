@@ -3,6 +3,7 @@ import { sound } from '../audio/soundManager'
 import { useT } from '../i18n'
 import { refs } from '../store/refs'
 import { GRIP, COIN } from '../config/gameConfig'
+import { createShareCard, downloadDataUrl } from '../utils/shareCard'
 
 export function ResultModal() {
   const resultInfo = useGameStore((s) => s.resultInfo)
@@ -38,7 +39,7 @@ export function ResultModal() {
           {ok
             ? t.result.successBody(t.result.seconds((resultInfo.timeMs / 1000).toFixed(1)), successes, remaining)
             : resultInfo.slipped
-              ? t.result.slipped
+              ? t.result.slipReasons[resultInfo.slipReason ?? 'weakGrip']
               : resultInfo.bounced
                 ? t.result.bounced
                 : t.result.failBody}
@@ -70,6 +71,23 @@ export function ResultModal() {
             {remaining > 0 ? t.result.playAgain : t.result.viewSummary}
           </button>
         </div>
+        {ok && (
+          <button
+            className="share-link"
+            onClick={() => {
+              sound.play('click')
+              const url = createShareCard({
+                title: t.result.successTitle,
+                toyLine: t.share.toyLine(successes),
+                statLine: t.share.statLine(t.result.seconds((resultInfo.timeMs / 1000).toFixed(1))),
+                footer: t.share.footer,
+              })
+              downloadDataUrl(url, 'claw-share.png')
+            }}
+          >
+            📤 {t.share.button}
+          </button>
+        )}
       </div>
     </div>
   )

@@ -3,8 +3,8 @@ import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { BallCollider, RigidBody, type RapierRigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
-import { ASSETS, PHYSICS, TOY } from '../config/gameConfig'
-import { useGameStore } from '../store/gameStore'
+import { ASSETS, PHYSICS, TOY, TOY_TYPE_MAP, type ToyTypeKey } from '../config/gameConfig'
+import { toyBodies, useGameStore } from '../store/gameStore'
 import { supportsWebP } from '../utils/capabilities'
 
 export function dogModelUrl(): string {
@@ -25,9 +25,11 @@ const _q = new THREE.Quaternion()
 const _s = new THREE.Vector3()
 const _base = new THREE.Matrix4()
 const _m = new THREE.Matrix4()
+const _c = new THREE.Color()
 
 /** Physics + game logic only; rendering is done by ToyInstances in a single pass per submesh */
-function ToyBody({ id, spawn }: { id: number; spawn: [number, number] }) {
+function ToyBody({ id, spawn, type }: { id: number; spawn: [number, number]; type: ToyTypeKey }) {
+  const def = TOY_TYPE_MAP[type]
   const status = useGameStore((s) => s.toys.find((t) => t.id === id)?.status)
   const [gone, setGone] = useState(false)
   const bodyRef = useRef<RapierRigidBody | null>(null)
@@ -86,18 +88,20 @@ function ToyBody({ id, spawn }: { id: number; spawn: [number, number] }) {
         if (!body) return
         bodyRef.current = body
         toyRegistry.set(id, body)
+        toyBodies.set(id, body)
         return () => {
           bodyRef.current = null
           toyRegistry.delete(id)
+          toyBodies.delete(id)
         }
       }}
       colliders={false}
-      position={[spawn[0], PHYSICS.floorY + TOY.radius + 0.02, spawn[1]]}
+      position={[spawn[0], PHYSICS.floorY + TOY.radius + 0.35 + (id % 5) * 0.16, spawn[1]]}
       userData={{ toyId: id }}
       linearDamping={0.4}
       angularDamping={0.6}
     >
-      <BallCollider args={[TOY.radius]} />
+      <BallCollider args={[TOY.radius * def.scale]} density={def.density} />
     </RigidBody>
   )
 }
@@ -107,6 +111,7 @@ function ToyBody({ id, spawn }: { id: number; spawn: [number, number] }) {
  * submeshes × toy count), following r3f scaling-performance guidance.
  */
 function ToyInstances({ ids }: { ids: number[] }) {
+  const types = useGameStore((s) => s.toys.map((toy) => toy.type).join(','))
   const { scene } = useGLTF(dogModelUrl())
   const parts = useMemo(() => {
     const src = scene.clone(true)
@@ -126,7 +131,20 @@ function ToyInstances({ ids }: { ids: number[] }) {
   }, [scene])
   const meshRefs = useRef<(THREE.InstancedMesh | null)[]>([])
 
+  // Per-instance tint from the toy type (instanceColor keeps one draw call per submesh)
+  useEffect(() => {
+    const toys = useGameStore.getState().toys
+    for (const im of meshRefs.current) {
+      if (!im) continue
+      for (let i = 0; i < toys.length; i++) {
+        im.setColorAt(i, _c.set(TOY_TYPE_MAP[toys[i].type].tint))
+      }
+      if (im.instanceColor) im.instanceColor.needsUpdate = true
+    }
+  }, [types, parts])
+
   useFrame(() => {
+    const toys = useGameStore.getState().toys
     for (let i = 0; i < ids.length; i++) {
       const body = toyRegistry.get(ids[i])
       const sc = toyScale.get(ids[i]) ?? 1
@@ -137,7 +155,7 @@ function ToyInstances({ ids }: { ids: number[] }) {
         const r = body.rotation()
         _p.set(t.x, t.y, t.z)
         _q.set(r.x, r.y, r.z, r.w)
-        _s.setScalar(sc)
+        _s.setScalar(sc * TOY_TYPE_MAP[toys[i]?.type ?? 'shiba'].scale)
         _base.compose(_p, _q, _s).multiply(VISUAL_OFFSET)
       }
       for (let k = 0; k < parts.length; k++) {
@@ -178,7 +196,7 @@ export function Toys() {
   return (
     <>
       {toys.map((t) => (
-        <ToyBody key={t.id} id={t.id} spawn={t.spawn} />
+        <ToyBody key={t.id} id={t.id} spawn={t.spawn} type={t.type} />
       ))}
       <ToyInstances ids={ids} />
     </>

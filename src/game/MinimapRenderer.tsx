@@ -75,7 +75,16 @@ export function MinimapRenderer() {
     gl.setViewport(0, 0, size.width, size.height)
     gl.render(scene, camera)
 
-    if (!minimapOn) return
+    // Photo mode: clean shot without the minimap; honor pending capture requests
+    const photoMode = useGameStore.getState().photoMode
+    if (refs.captureRequest) {
+      refs.captureRequest = false
+      const a = document.createElement('a')
+      a.href = gl.domElement.toDataURL('image/png')
+      a.download = `claw-photo-${Date.now()}.png`
+      a.click()
+    }
+    if (!minimapOn || photoMode) return
 
     // Refresh the top-down capture every 3rd frame; toys move slowly enough
     frame.current++

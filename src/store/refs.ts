@@ -27,6 +27,12 @@ interface HotRefs {
   successPulseAt: number
   shakeAt: number
   slipStreak: number
+  clawShakeAt: number
+  /** One-shot camera preset request: 0 front / 1 side / 2 top, -1 = none */
+  viewRequest: number
+  captureRequest: boolean
+  coinDuration: number
+  skipAnim: boolean
   perf: { fps: number; ms: number; drawCalls: number; triangles: number }
 }
 
@@ -47,6 +53,11 @@ export const refs: HotRefs = {
   successPulseAt: 0,
   shakeAt: 0,
   slipStreak: 0,
+  clawShakeAt: 0,
+  viewRequest: -1,
+  captureRequest: false,
+  coinDuration: 950,
+  skipAnim: false,
   perf: { fps: 0, ms: 0, drawCalls: 0, triangles: 0 },
 }
 
@@ -62,6 +73,7 @@ export function clearMovementInput(): void {
 export function resetRoundRefs(): void {
   refs.grabPhase = 'idle'
   refs.closeProgress = 0
+  refs.skipAnim = false
   refs.candidateToyId = -1
   refs.clawHits.forEach((s) => s.clear())
 }

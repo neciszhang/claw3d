@@ -2,7 +2,8 @@ import { minimapLayout } from '../game/MinimapRenderer'
 import { remainingToys, useGameStore } from '../store/gameStore'
 import { sound } from '../audio/soundManager'
 import { useT } from '../i18n'
-import { useEffect, useState } from 'react'
+import { refs } from '../store/refs'
+import { useEffect, useRef, useState } from 'react'
 
 export function HUD() {
   const status = useGameStore((s) => s.status)
@@ -16,8 +17,19 @@ export function HUD() {
   const openOverlay = useGameStore((s) => s.openOverlay)
   const dailyBonus = useGameStore((s) => s.dailyBonus)
   const clearDailyBonus = useGameStore((s) => s.clearDailyBonus)
+  const stars = useGameStore((s) => s.progress.stars)
+  const shakeUsed = useGameStore((s) => s.shakeUsed)
+  const shakeMachine = useGameStore((s) => s.shakeMachine)
+  const achievementFlash = useGameStore((s) => s.achievementFlash)
+  const clearAchievementFlash = useGameStore((s) => s.clearAchievementFlash)
+  const slipFlash = useGameStore((s) => s.slipFlash)
+  const clearSlipFlash = useGameStore((s) => s.clearSlipFlash)
+  const resultInfo = useGameStore((s) => s.resultInfo)
+  const attempts2 = useGameStore((s) => s.attempts)
   const t = useT()
   const [vw, setVw] = useState(() => window.innerWidth)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const nextView = useRef(-1)
 
   // Daily bonus toast: wait until the player reaches the playable screen, then show for 4s (avoid being covered by the tutorial modal)
   const bonusVisible =
@@ -27,6 +39,20 @@ export function HUD() {
     const id = window.setTimeout(clearDailyBonus, 4000)
     return () => window.clearTimeout(id)
   }, [bonusVisible, clearDailyBonus])
+
+  // Achievement unlock toast
+  useEffect(() => {
+    if (!achievementFlash) return
+    const id = window.setTimeout(clearAchievementFlash, 3200)
+    return () => window.clearTimeout(id)
+  }, [achievementFlash, clearAchievementFlash])
+
+  // Slip callout: show the reason for ~1.6s right at the moment of slipping
+  useEffect(() => {
+    if (!slipFlash) return
+    const id = window.setTimeout(clearSlipFlash, 1600)
+    return () => window.clearTimeout(id)
+  }, [slipFlash, clearSlipFlash])
 
   useEffect(() => {
     const onResize = () => setVw(window.innerWidth)
@@ -45,12 +71,22 @@ export function HUD() {
     <>
       <div className="hud-top">
         <div className="hud-left" aria-live="polite">
-          <span className={`hud-chip status-${status.toLowerCase()}`}>
+          <span className={`hud-chip hide-mobile status-${status.toLowerCase()}`}>
             {t.status[status] ?? status}
           </span>
           <span className="hud-chip coin-chip">{t.hud.coins(coins)}</span>
-          <span className="hud-chip">{t.hud.grabs(attempts)}</span>
-          <span className="hud-chip">{t.hud.wins(successes)}</span>
+          <button
+            className="hud-chip star-chip"
+            aria-label={t.album.title}
+            onClick={() => {
+              sound.play('click')
+              openOverlay('album')
+            }}
+          >
+            ⭐ {stars}
+          </button>
+          <span className="hud-chip hide-mobile">{t.hud.grabs(attempts)}</span>
+          <span className="hud-chip hide-mobile">{t.hud.wins(successes)}</span>
           <span className="hud-chip">{t.hud.left(remainingToys(toys))}</span>
           {successes > 0 && (
             <div className="collection-bar" aria-label={t.hud.wins(successes)}>
@@ -66,39 +102,26 @@ export function HUD() {
         <div className="hud-right">
           <button
             className="icon-btn"
-            aria-label={settings.sfx ? t.settings.off : t.settings.on}
-            aria-pressed={settings.sfx}
+            aria-label={t.hud.view}
             onClick={() => {
-              const next = !settings.sfx
-              updateSettings({ sfx: next, music: next })
-              sound.syncMusic()
-              if (next) sound.play('click')
+              sound.play('click')
+              nextView.current = (nextView.current + 1) % 3
+              refs.viewRequest = nextView.current
             }}
           >
-            {settings.sfx ? '♪' : '♪̸'}
-            <i className="btn-label">{settings.sfx ? t.hud.soundOn : t.hud.soundOff}</i>
+            🎥<i className="btn-label">{t.hud.view}</i>
           </button>
           <button
             className="icon-btn"
-            aria-label={t.hud.help}
+            aria-label={t.hud.shake}
+            disabled={shakeUsed || !(status === 'READY' || status === 'MOVING' || status === 'UNPAID')}
             onClick={() => {
-              sound.play('click')
-              openOverlay('help')
+              sound.play('close')
+              sound.vibrate([30, 30, 30])
+              shakeMachine()
             }}
           >
-            ?<i className="btn-label">{t.hud.help}</i>
-          </button>
-          <button
-            className="icon-btn"
-            data-role="settings"
-            aria-label={t.hud.settings}
-            disabled={!canPause}
-            onClick={() => {
-              sound.play('click')
-              openOverlay('settings')
-            }}
-          >
-            ⚙<i className="btn-label">{t.hud.settings}</i>
+            🫨<i className="btn-label">{t.hud.shake}</i>
           </button>
           <button
             className="icon-btn"
@@ -112,8 +135,66 @@ export function HUD() {
           >
             ⏸<i className="btn-label">{t.hud.pause}</i>
           </button>
+          <button
+            className="icon-btn"
+            aria-label={t.hud.more}
+            aria-expanded={menuOpen}
+            onClick={() => {
+              sound.play('click')
+              setMenuOpen((v) => !v)
+            }}
+          >
+            ⋯<i className="btn-label">{t.hud.more}</i>
+          </button>
+          {menuOpen && (
+            <div className="hud-menu" role="menu">
+              <button
+                role="menuitem"
+                onClick={() => {
+                  const next = !settings.sfx
+                  updateSettings({ sfx: next, music: next })
+                  sound.syncMusic()
+                  if (next) sound.play('click')
+                }}
+              >
+                {settings.sfx ? '♪' : '♪̸'} {settings.sfx ? t.hud.soundOn : t.hud.soundOff}
+              </button>
+              <button role="menuitem" onClick={() => { sound.play('click'); setMenuOpen(false); openOverlay('album') }}>
+                📔 {t.album.title}
+              </button>
+              <button role="menuitem" onClick={() => { sound.play('click'); setMenuOpen(false); openOverlay('history') }}>
+                🕘 {t.hud.history}
+              </button>
+              <button role="menuitem" onClick={() => { sound.play('click'); setMenuOpen(false); openOverlay('help') }}>
+                ❓ {t.hud.help}
+              </button>
+              <button
+                role="menuitem"
+                data-role="settings"
+                disabled={!canPause}
+                onClick={() => { sound.play('click'); setMenuOpen(false); openOverlay('settings') }}
+              >
+                ⚙️ {t.hud.settings}
+              </button>
+            </div>
+          )}
         </div>
       </div>
+      {achievementFlash && (
+        <div className="achievement-toast" role="status">
+          🏆 {t.album.achv[achievementFlash]?.name ?? achievementFlash}
+        </div>
+      )}
+      {slipFlash && (
+        <div className="slip-flash" role="status">
+          {t.result.slipFlash[slipFlash.reason]}
+        </div>
+      )}
+      {resultInfo?.result === 'success' && (
+        <div key={attempts2} className="coin-fly" aria-hidden>
+          🪙
+        </div>
+      )}
       {bonusVisible && (
         <div className="daily-bonus-toast" role="status">
           {t.hud.dailyBonus(dailyBonus)}

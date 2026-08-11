@@ -73,6 +73,13 @@ export function Claw() {
     if (!g) return
     const { clawPos, closeProgress } = refs
     g.position.set(clawPos.x, clawPos.y, clawPos.z)
+    // Catch jolt: brief decaying jitter right after a successful judge
+    const je = performance.now() - refs.clawShakeAt
+    if (refs.clawShakeAt > 0 && je < 220) {
+      const amp = 0.012 * (1 - je / 220)
+      g.position.x += Math.sin(je * 0.16) * amp
+      g.position.y += Math.sin(je * 0.23 + 1.3) * amp
+    }
 
     // Sample skeletal open/close animation by progress
     const action = Object.values(actions)[0]
