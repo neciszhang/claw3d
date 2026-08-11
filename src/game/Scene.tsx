@@ -48,6 +48,9 @@ function ShadowController() {
       status === 'GRABBING' || status === 'MOVING' || status === 'RESETTING' || status === 'LOADING'
     if (!active) {
       for (const body of toyRegistry.values()) {
+        // Skip kinematic bodies: carried toys are covered by the GRABBING status,
+        // and parked collected toys must never keep the shadow map alive
+        if (body.isKinematic()) continue
         if (!body.isSleeping()) {
           active = true
           break

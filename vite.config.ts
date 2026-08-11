@@ -9,4 +9,17 @@ export default defineConfig(({ command }) => ({
   plugins: [react()],
   base: command === 'build' ? `/${repoName}/` : '/',
   server: { host: true },
+  build: {
+    // Vendor chunks: three / rapier (embedded wasm) / react rarely change,
+    // so returning visitors keep them cached across app deploys
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three'],
+          physics: ['@dimforge/rapier3d-compat'],
+          react: ['react', 'react-dom'],
+        },
+      },
+    },
+  },
 }))
