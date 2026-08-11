@@ -71,8 +71,8 @@ export function Scene() {
     <>
       <color attach="background" args={['#150d2e']} />
       <fog attach="fog" args={['#0c0722', 13, 30]} />
-      <hemisphereLight args={['#cfd8ff', '#3a2a55', 0.9]} />
-      <ambientLight intensity={1.15} />
+      {/* Hemisphere covers the ambient term too (fewer lights = cheaper fragments) */}
+      <hemisphereLight args={['#cfd8ff', '#3a2a55', 2.0]} />
       <directionalLight
         position={[2.5, 4, 2]}
         intensity={2.2}
@@ -85,9 +85,8 @@ export function Scene() {
         shadow-camera-near={1}
         shadow-camera-far={12}
       />
-      <pointLight position={[0, 1.8, 0]} intensity={2.2} distance={5} />
-      <pointLight position={[0, 0.6, 0.6]} intensity={1.2} distance={3.5} />
-      <pointLight position={[0, 2.5, 3]} intensity={1.0} distance={9} />
+      {/* Single interior fill light (was 3 point lights) */}
+      <pointLight position={[0, 1.4, 0.4]} intensity={3.2} distance={6} />
       <Stage />
       <PerfMonitor />
       <ShadowController />

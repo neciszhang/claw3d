@@ -65,3 +65,8 @@ export function resetRoundRefs(): void {
   refs.candidateToyId = -1
   refs.clawHits.forEach((s) => s.clear())
 }
+
+// Expose hot refs for automated tests/debugging (dev only)
+if (import.meta.env.DEV) {
+  ;(window as unknown as { __refs?: typeof refs }).__refs = refs
+}

@@ -513,10 +513,6 @@ export function Stage() {
         />
       </sprite>
 
-      {/* Colored fill lights on both sides */}
-      <pointLight position={[-4, 1.5, 2]} intensity={6} distance={12} color="#4dd8ff" />
-      <pointLight position={[4, 1.2, -2]} intensity={6} distance={12} color="#ff5c8a" />
-
       {/* Stage spotlight */}
       <spotLight
         position={[0, 6.5, 3.5]}
@@ -551,22 +547,32 @@ export function Stage() {
 /** Sample render stats for the performance panel (aggregated to refs.perf every 500ms) */
 export function PerfMonitor() {
   const enabled = useGameStore((s) => s.settings.perfPanel)
-  const acc = useRef({ frames: 0, last: performance.now() })
+  const acc = useRef({ frames: 0, last: performance.now(), calls: 0, tris: 0 })
 
+  // Priority 2: runs after MinimapRenderer (priority 1) has issued every render pass of the
+  // frame. autoReset is disabled so gl.info accumulates across all passes (main + offscreen
+  // RTs + minimap); we read the per-frame totals here and reset manually.
   useFrame(({ gl }) => {
-    if (!enabled) return
+    if (!enabled) {
+      gl.info.autoReset = true
+      return
+    }
+    gl.info.autoReset = false
     const a = acc.current
     a.frames++
+    a.calls = gl.info.render.calls
+    a.tris = gl.info.render.triangles
+    gl.info.reset()
     const now = performance.now()
     const span = now - a.last
     if (span >= 500) {
       refs.perf.fps = Math.round((a.frames * 1000) / span)
       refs.perf.ms = Math.round((span / a.frames) * 10) / 10
-      refs.perf.drawCalls = gl.info.render.calls
-      refs.perf.triangles = gl.info.render.triangles
+      refs.perf.drawCalls = a.calls
+      refs.perf.triangles = a.tris
       a.frames = 0
       a.last = now
     }
-  })
+  }, 2)
   return null
 }

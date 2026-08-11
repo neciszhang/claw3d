@@ -3,7 +3,6 @@ import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { BallCollider, RigidBody, type RapierRigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
-import { SkeletonUtils } from 'three-stdlib'
 import { ASSETS, PHYSICS, TOY } from '../config/gameConfig'
 import { useGameStore } from '../store/gameStore'
 import { supportsWebP } from '../utils/capabilities'
@@ -14,27 +13,34 @@ export function dogModelUrl(): string {
 
 /** Grab controller manipulates toy rigid bodies directly through this registry */
 export const toyRegistry = new Map<number, RapierRigidBody>()
+/** Per-toy visual scale driven by the collect animation; consumed by ToyInstances */
+const toyScale = new Map<number, number>()
 
 const COLLECT_DELAY = 1500
 const COLLECT_DURATION = 800
+const VISUAL_OFFSET = new THREE.Matrix4().makeTranslation(-1.28, -0.23, 0.06)
 
-function Toy({ id, spawn }: { id: number; spawn: [number, number] }) {
-  const { scene } = useGLTF(dogModelUrl())
+const _p = new THREE.Vector3()
+const _q = new THREE.Quaternion()
+const _s = new THREE.Vector3()
+const _base = new THREE.Matrix4()
+const _m = new THREE.Matrix4()
+
+/** Physics + game logic only; rendering is done by ToyInstances in a single pass per submesh */
+function ToyBody({ id, spawn }: { id: number; spawn: [number, number] }) {
   const status = useGameStore((s) => s.toys.find((t) => t.id === id)?.status)
   const [gone, setGone] = useState(false)
   const bodyRef = useRef<RapierRigidBody | null>(null)
-  const visual = useRef<THREE.Group>(null)
   const collect = useRef<{ start: number; fromY: number } | null>(null)
 
-  const model = useMemo(() => {
-    const cloned = SkeletonUtils.clone(scene)
-    cloned.traverse((o: any) => {
-      if (o.isMesh) o.castShadow = true
-    })
-    return cloned
-  }, [scene])
+  useEffect(() => {
+    toyScale.set(id, 1)
+    return () => {
+      toyScale.delete(id)
+    }
+  }, [id])
 
-  // Delay briefly after a toy falls into the exit, then play the collect animation (approach A: recycle to prevent pile-up)
+  // Delay briefly after a toy falls into the exit, then play the collect animation (recycle to prevent pile-up)
   useEffect(() => {
     if (status !== 'out') return
     const timer = window.setTimeout(() => {
@@ -60,7 +66,7 @@ function Toy({ id, spawn }: { id: number; spawn: [number, number] }) {
       }
       body.wakeUp()
       body.setNextKinematicTranslation({ x: 30 + id * 2, y: -60, z: 30 })
-      if (visual.current) visual.current.visible = false
+      toyScale.set(id, 0)
       setGone(true)
       return
     }
@@ -71,8 +77,7 @@ function Toy({ id, spawn }: { id: number; spawn: [number, number] }) {
       y: c.fromY + t * 0.45,
       z: pos.z,
     })
-    const s = Math.max(0.01, 1 - t * t)
-    visual.current?.scale.setScalar(s)
+    toyScale.set(id, Math.max(0.01, 1 - t * t))
   })
 
   return (
@@ -93,22 +98,89 @@ function Toy({ id, spawn }: { id: number; spawn: [number, number] }) {
       angularDamping={0.6}
     >
       <BallCollider args={[TOY.radius]} />
-      <group ref={visual}>
-        <group position={[-1.28, -0.23, 0.06]}>
-          <primitive object={model} />
-        </group>
-      </group>
     </RigidBody>
+  )
+}
+
+/**
+ * All toys rendered with instancedMesh (one draw call per GLB submesh instead of
+ * submeshes × toy count), following r3f scaling-performance guidance.
+ */
+function ToyInstances({ ids }: { ids: number[] }) {
+  const { scene } = useGLTF(dogModelUrl())
+  const parts = useMemo(() => {
+    const src = scene.clone(true)
+    src.updateMatrixWorld(true)
+    const list: { geometry: THREE.BufferGeometry; material: THREE.Material; local: THREE.Matrix4 }[] = []
+    src.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (mesh.isMesh) {
+        list.push({
+          geometry: mesh.geometry,
+          material: mesh.material as THREE.Material,
+          local: mesh.matrixWorld.clone(),
+        })
+      }
+    })
+    return list
+  }, [scene])
+  const meshRefs = useRef<(THREE.InstancedMesh | null)[]>([])
+
+  useFrame(() => {
+    for (let i = 0; i < ids.length; i++) {
+      const body = toyRegistry.get(ids[i])
+      const sc = toyScale.get(ids[i]) ?? 1
+      if (!body || sc <= 0.001) {
+        _base.makeScale(0, 0, 0)
+      } else {
+        const t = body.translation()
+        const r = body.rotation()
+        _p.set(t.x, t.y, t.z)
+        _q.set(r.x, r.y, r.z, r.w)
+        _s.setScalar(sc)
+        _base.compose(_p, _q, _s).multiply(VISUAL_OFFSET)
+      }
+      for (let k = 0; k < parts.length; k++) {
+        const im = meshRefs.current[k]
+        if (!im) continue
+        _m.multiplyMatrices(_base, parts[k].local)
+        im.setMatrixAt(i, _m)
+      }
+    }
+    for (const im of meshRefs.current) {
+      if (im) im.instanceMatrix.needsUpdate = true
+    }
+  })
+
+  return (
+    <>
+      {parts.map((p, k) => (
+        <instancedMesh
+          key={k}
+          ref={(el) => {
+            meshRefs.current[k] = el
+          }}
+          args={[p.geometry, p.material, ids.length]}
+          castShadow
+          frustumCulled={false}
+        />
+      ))}
+    </>
   )
 }
 
 export function Toys() {
   const toys = useGameStore((s) => s.toys)
+  // Depend on length only: toy ids never change within a game, and an unstable
+  // reference would re-create the instancedMeshes (r3f pitfalls: avoid re-mounting)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const ids = useMemo(() => toys.map((t) => t.id), [toys.length])
   return (
     <>
       {toys.map((t) => (
-        <Toy key={t.id} id={t.id} spawn={t.spawn} />
+        <ToyBody key={t.id} id={t.id} spawn={t.spawn} />
       ))}
+      <ToyInstances ids={ids} />
     </>
   )
 }
